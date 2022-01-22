@@ -2,6 +2,7 @@ package de.hechler.cometchallenge;
 
 import java.awt.image.BufferedImage;
 import java.awt.image.WritableRaster;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Logger;
@@ -10,23 +11,36 @@ public class ImageAnalyzer {
 
 	private final static Logger logger = Logger.getLogger(ImageAnalyzer.class.getName());
 	
+	private Path path;
+
 	private int[][] matrix;
 	private int width;
 	private int height;
 	
 	
 	
-	public ImageAnalyzer(int[][] matrix) {
+	public ImageAnalyzer(Path path, int[][] matrix) {
+		this.path = path;
 		this.matrix = matrix;
 		this.height = matrix.length;
 		this.width = matrix[0].length;
 	}
+
+	public Path getPath() {
+		return path;
+	}
+	
+	public String getFilename() {
+		return path==null?"?":path.getFileName().toString();
+	}
 	
 	public int get(int x, int y) {
-		if (!isInRange(x, y)) {
-			return 0;
+		if (isInRange(x, y)) {
+			return matrix[y][x];
 		}
-		return matrix[y][x];
+		int borderX = Math.max(0, Math.min(width-1, x));
+		int borderY = Math.max(0, Math.min(height-1, y));
+		return matrix[borderY][borderX];
 	}
 
 	public MinMaxCounter countNeighbours(int x, int y, int dist) {
@@ -115,18 +129,14 @@ public class ImageAnalyzer {
 
 
 	public BufferedImage createBufferedImage(int fromX, int fromY, int toX, int toY) {
-		int gray[] = new int[1];
-		MinMaxCounter range = new MinMaxCounter();
-		for (int y=fromY; y<=toY; y++) {
-			for (int x=fromX; x<=toX; x++) {
-				if (isInRange(x, y)) {
-					range.update(get(x,y));
-				}
-			}
-		}
+		MinMaxCounter range = calcMinMax(fromX, fromY, toX, toY);
+		return createBufferedImage(range, fromX, fromY, toX, toY);
+	}
+	
+	public BufferedImage createBufferedImage(MinMaxCounter range, int fromX, int fromY, int toX, int toY) {
 		int offset = range.getMin(); 
 		double scale = 255.0/(range.getMax() - range.getMin() + 0.0001);
-		
+		int[] gray = new int[1];
 		BufferedImage result = new BufferedImage(toX-fromX+1, toY-fromY+1, BufferedImage.TYPE_BYTE_GRAY);
 		WritableRaster raster = result.getRaster();
 		for (int y=fromY; y<=toY; y++) {
@@ -140,6 +150,16 @@ public class ImageAnalyzer {
 
 	private boolean isInRange(int x, int y) {
 		return (x>=0) && (x<width) & (y>=0) && (y<height);
+	}
+
+	public MinMaxCounter calcMinMax(int fromX, int fromY, int toX, int toY) {
+		MinMaxCounter result = new MinMaxCounter();
+		for (int y=fromY; y<=toY; y++) {
+			for (int x=fromX; x<=toX; x++) {
+				result.update(get(x,y));
+			}
+		}
+		return result;
 	}
 
 }

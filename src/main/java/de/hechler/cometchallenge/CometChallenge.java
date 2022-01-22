@@ -61,21 +61,71 @@ public class CometChallenge {
 				String filename = cometLine.replaceFirst(COMETPOS_RX, "$2");
 				double xPos = Double.parseDouble(cometLine.replaceFirst(COMETPOS_RX, "$3"));
 				double yPos = Double.parseDouble(cometLine.replaceFirst(COMETPOS_RX, "$4"));
-				cometPositionForFilename.put(filename, new Pos((int)xPos, (int)yPos));
+				cometPositionForFilename.put(filename, new Pos((int)(xPos+0.5), (int)(yPos+0.5)));
 			}
 			System.out.println(cometPositionForFilename);
 			
 			
 			List<Path> files = Files.list(folder).filter(p -> p.getFileName().toString().endsWith(".fts"))
 					.collect(Collectors.toList());
-			for (Path file : files) {
-				List<Pos> spots = processFile(file);
-				String csvFilename = file.toString().replace(".fts", "")+"-spots.csv";
+			ImageAnalyzer lastImage = null;
+			ImageAnalyzer thisImage = null;
+			ImageAnalyzer nextImage = null;
+			// edge case first image: use next image as previous image
+			lastImage = readFile(files.get(1));
+			thisImage = readFile(files.get(0));
+			for (int i=0; i<files.size(); i++) {
+				if (i==files.size()-1) {
+					// edge case last image: use previous image as next image
+					nextImage = lastImage;
+				}
+				else {
+					nextImage = readFile(files.get(i+1));
+				}
+				
+				List<Pos> spots = runAnalysis(lastImage, thisImage, nextImage);
+				String csvFilename = files.get(i).toString().replace(".fts", "")+"-spots.csv";
 				writeCSV(csvFilename, spots);
+				
+				lastImage = thisImage;
+				thisImage = nextImage;
 			}
 		} catch (IOException e) {
 			throw new RuntimeException(e.toString(), e);
 		}
+	}
+
+	private List<Pos> runAnalysis(ImageAnalyzer lastImage, ImageAnalyzer thisImage, ImageAnalyzer nextImage) {
+		Pos cometPos = cometPositionForFilename.get(thisImage.getFilename());
+		Pos correctedCometPos = searchMax(thisImage, cometPos.getX()-5, cometPos.getY()-5, cometPos.getX()+5, cometPos.getY()+5);
+		logger.info(cometPos + " -> " + correctedCometPos);
+		showCompare3Details(lastImage, thisImage, nextImage, correctedCometPos);
+		thisImage.checkCentrum(correctedCometPos.getX(), correctedCometPos.getY());
+		List<Pos> centers = new ArrayList<>();
+		centers.add(correctedCometPos);
+		return centers;
+	}
+
+	private ImageAnalyzer readFile(Path path) {
+		String filename = path.getFileName().toString();
+		logger.info("reading "+filename);
+		FITS_Reader reader = new FITS_Reader();
+		reader.run(path.toString());
+		ImagePlus imp = (ImagePlus)reader;
+		ImageProcessor imgProc = imp.getProcessor();
+		ShortProcessor shortProc = (ShortProcessor)imgProc.convertToShort(false);
+		BufferedImage gray16img = shortProc.get16BitBufferedImage();
+		Raster raster = gray16img.getData();
+		DataBuffer dataBuffer = raster.getDataBuffer();
+		int w = imp.getWidth();
+		int h = imp.getHeight();
+		int[][] matrix = new int[h][w];
+		for (int y = 0; y<h; y++) {
+			for (int x = 0; x<w; x++) {
+				matrix[h-1-y][x] = dataBuffer.getElem(h*y+x);
+			}
+		}
+		return new ImageAnalyzer(path, matrix);
 	}
 
 	private void writeCSV(String csvFilename, List<Pos> spots) {
@@ -92,47 +142,53 @@ public class CometChallenge {
 		
 	}
 
-	private List<Pos> processFile(Path file) {
-		String filename = file.getFileName().toString();
-		logger.info("processing "+filename);
-		FITS_Reader reader = new FITS_Reader();
-		reader.run(file.toString());
-		ImagePlus imp = (ImagePlus)reader;
-		ImageProcessor imgProc = imp.getProcessor();
-		ShortProcessor shortProc = (ShortProcessor)imgProc.convertToShort(false);
-		BufferedImage gray16img = shortProc.get16BitBufferedImage();
-		Raster raster = gray16img.getData();
-		DataBuffer dataBuffer = raster.getDataBuffer();
-		
-		int[][] matrix = new int[1024][1024];
-		for (int y = 0; y<1024; y++) {
-			for (int x = 0; x<1024; x++) {
-				matrix[1023-y][x] = dataBuffer.getElem(1024*y+x);
-			}
-		}
-		ImageAnalyzer ia = new ImageAnalyzer(matrix);
-		
-		Pos cometPos = cometPositionForFilename.get(filename);
-//		if (filename.equals("22721520.fts")) {
-//			Pos correctedCometPos = searchMax(ia, cometPos.getX()-10, cometPos.getY()-10, cometPos.getX()+10, cometPos.getY()+10);
+	private int[][] lastMatrix = new int[1024][1024];
+	
+//	private List<Pos> processFile(Path file) {
+//		String filename = file.getFileName().toString();
+//		logger.info("processing "+filename);
+//		FITS_Reader reader = new FITS_Reader();
+//		reader.run(file.toString());
+//		ImagePlus imp = (ImagePlus)reader;
+//		ImageProcessor imgProc = imp.getProcessor();
+//		ShortProcessor shortProc = (ShortProcessor)imgProc.convertToShort(false);
+//		BufferedImage gray16img = shortProc.get16BitBufferedImage();
+//		Raster raster = gray16img.getData();
+//		DataBuffer dataBuffer = raster.getDataBuffer();
+//		
+//		int[][] matrix = new int[1024][1024];
+//		for (int y = 0; y<1024; y++) {
+//			for (int x = 0; x<1024; x++) {
+//				matrix[1023-y][x] = dataBuffer.getElem(1024*y+x);
+//			}
 //		}
-		Pos correctedCometPos = searchMax(ia, cometPos.getX()-10, cometPos.getY()-10, cometPos.getX()+10, cometPos.getY()+10);
-		//Pos correctedCometPos = searchMax(ia, cometPos.getX()-5, cometPos.getY()-5, cometPos.getX()+5, cometPos.getY()+5);
-		logger.info(cometPos + " -> " + correctedCometPos);
-		showDetails(filename, ia, correctedCometPos);
-		ia.checkCentrum(correctedCometPos.getX(), correctedCometPos.getY());
-		// showRange(ia, 900,1010, 920, 1023);
-
-		//List<Pos> centers = ia.findCenters();
-		//logger.info(centers.toString());
-		//for (Pos center:centers) {
-		//	showDetails(ia, center);
-		//}
-		
-		List<Pos> centers = new ArrayList<>();
-		centers.add(correctedCometPos);
-		return centers;
-	}
+//		ImageAnalyzer ia = new ImageAnalyzer(matrix);
+//		ImageAnalyzer iaLast = new ImageAnalyzer(lastMatrix);
+//		
+//		Pos cometPos = cometPositionForFilename.get(filename);
+////		if (filename.equals("22721520.fts")) {
+////			Pos correctedCometPos = searchMax(ia, cometPos.getX()-10, cometPos.getY()-10, cometPos.getX()+10, cometPos.getY()+10);
+////		}
+//		Pos correctedCometPos = searchMax(ia, cometPos.getX()-5, cometPos.getY()-5, cometPos.getX()+5, cometPos.getY()+5);
+//		//Pos correctedCometPos = searchMax(ia, cometPos.getX()-5, cometPos.getY()-5, cometPos.getX()+5, cometPos.getY()+5);
+//		logger.info(cometPos + " -> " + correctedCometPos);
+//		showCompareDetails(filename, ia, iaLast, correctedCometPos);
+//		ia.checkCentrum(correctedCometPos.getX(), correctedCometPos.getY());
+//		// showRange(ia, 900,1010, 920, 1023);
+//
+//		//List<Pos> centers = ia.findCenters();
+//		//logger.info(centers.toString());
+//		//for (Pos center:centers) {
+//		//	showDetails(ia, center);
+//		//}
+//		
+//		List<Pos> centers = new ArrayList<>();
+//		centers.add(correctedCometPos);
+//		
+//		lastMatrix = matrix;
+//		
+//		return centers;
+//	}
 
 	private Pos searchMax(ImageAnalyzer ia, int fromX, int fromY, int toX, int toY) {
 		int maxLight = -1;
@@ -147,6 +203,44 @@ public class CometChallenge {
 			}
 		}
 		return result;
+	}
+
+	private void showCompare3Details(ImageAnalyzer iaPrevious, ImageAnalyzer iaThis, ImageAnalyzer iaNext, Pos center) {
+		int fromX = center.getX()-5;
+		int toX = center.getX()+5;
+		int fromY = center.getY()-5;
+		int toY = center.getY()+5;
+		MinMaxCounter rangePrevious = iaPrevious.calcMinMax(fromX,fromY, toX,toY);
+		MinMaxCounter rangeThis = iaThis.calcMinMax(fromX,fromY, toX,toY);
+		MinMaxCounter rangeNext = iaNext.calcMinMax(fromX,fromY, toX,toY);
+		MinMaxCounter range = new MinMaxCounter(rangePrevious).update(rangeThis).update(rangeNext);
+		logger.fine("");
+		logger.fine("------------ CENTER "+center);
+		showRange(iaThis, center.getX()-5,center.getY()-5, center.getX()+5, center.getY()+5);
+		logger.fine("------------ PREVIOUS "+center);
+		showRange(iaPrevious, center.getX()-5,center.getY()-5, center.getX()+5, center.getY()+5);
+		logger.fine("------------ NEXT "+center);
+		showRange(iaNext, center.getX()-5,center.getY()-5, center.getX()+5, center.getY()+5);
+		BufferedImage biPrevious = iaPrevious.createBufferedImage(range, center.getX()-10,center.getY()-10, center.getX()+10, center.getY()+10);
+		BufferedImage biThis = iaThis.createBufferedImage(range, center.getX()-10,center.getY()-10, center.getX()+10, center.getY()+10);
+		BufferedImage biNext = iaNext.createBufferedImage(range, center.getX()-10,center.getY()-10, center.getX()+10, center.getY()+10);
+		biPrevious = scale(biPrevious, 10.0);
+		biThis = scale(biThis, 10.0);
+		biNext = scale(biNext , 10.0);
+		new Show3CompImage(iaThis.getFilename(), biPrevious, biThis, biNext);
+	}
+
+	private void showCompareDetails(String filename, ImageAnalyzer ia, ImageAnalyzer iaComp, Pos center) {
+		logger.fine("");
+		logger.fine("------------ CENTER "+center);
+		showRange(ia, center.getX()-5,center.getY()-5, center.getX()+5, center.getY()+5);
+		logger.fine("------------ COMP "+center);
+		showRange(iaComp, center.getX()-5,center.getY()-5, center.getX()+5, center.getY()+5);
+		BufferedImage bi = ia.createBufferedImage(center.getX()-10,center.getY()-10, center.getX()+10, center.getY()+10);
+		BufferedImage biComp = iaComp.createBufferedImage(center.getX()-10,center.getY()-10, center.getX()+10, center.getY()+10);
+		bi = scale(bi, 10.0);
+		biComp = scale(biComp, 10.0);
+		new ShowCompImage(filename, bi, biComp);
 	}
 
 	private void showDetails(String filename, ImageAnalyzer ia, Pos center) {
