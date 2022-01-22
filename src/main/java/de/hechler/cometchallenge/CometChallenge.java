@@ -99,7 +99,7 @@ public class CometChallenge {
 		Pos cometPos = cometPositionForFilename.get(thisImage.getFilename());
 		Pos correctedCometPos = searchMax(thisImage, cometPos.getX()-5, cometPos.getY()-5, cometPos.getX()+5, cometPos.getY()+5);
 		logger.info(cometPos + " -> " + correctedCometPos);
-		showCompare3Details(lastImage, thisImage, nextImage, correctedCometPos);
+		showCompare9Details(lastImage, thisImage, nextImage, correctedCometPos);
 		thisImage.checkCentrum(correctedCometPos.getX(), correctedCometPos.getY());
 		List<Pos> centers = new ArrayList<>();
 		centers.add(correctedCometPos);
@@ -203,6 +203,52 @@ public class CometChallenge {
 			}
 		}
 		return result;
+	}
+
+	private void showCompare9Details(ImageAnalyzer iaPrevious, ImageAnalyzer iaThis, ImageAnalyzer iaNext, Pos center) {
+		int fromX = center.getX()-5;
+		int toX = center.getX()+5;
+		int fromY = center.getY()-5;
+		int toY = center.getY()+5;
+		MinMaxCounter rangePrevious = iaPrevious.calcMinMax(fromX,fromY, toX,toY);
+		MinMaxCounter rangeThis = iaThis.calcMinMax(fromX,fromY, toX,toY);
+		MinMaxCounter rangeNext = iaNext.calcMinMax(fromX,fromY, toX,toY);
+		MinMaxCounter range = new MinMaxCounter(rangePrevious).update(rangeThis).update(rangeNext);
+		logger.fine("");
+		logger.fine("------------ CENTER "+center);
+		showRange(iaThis, center.getX()-5,center.getY()-5, center.getX()+5, center.getY()+5);
+		logger.fine("------------ PREVIOUS "+center);
+		showRange(iaPrevious, center.getX()-5,center.getY()-5, center.getX()+5, center.getY()+5);
+		logger.fine("------------ NEXT "+center);
+		showRange(iaNext, center.getX()-5,center.getY()-5, center.getX()+5, center.getY()+5);
+		BufferedImage biPreviousG = iaPrevious.createBufferedImage(range, center.getX()-10,center.getY()-10, center.getX()+10, center.getY()+10);
+		BufferedImage biThisG = iaThis.createBufferedImage(range, center.getX()-10,center.getY()-10, center.getX()+10, center.getY()+10);
+		BufferedImage biNextG = iaNext.createBufferedImage(range, center.getX()-10,center.getY()-10, center.getX()+10, center.getY()+10);
+		biPreviousG = scale(biPreviousG, 10.0);
+		biThisG = scale(biThisG, 10.0);
+		biNextG = scale(biNextG, 10.0);
+		BufferedImage biPrevious = iaPrevious.createBufferedImage(rangePrevious, center.getX()-10,center.getY()-10, center.getX()+10, center.getY()+10);
+		BufferedImage biThis = iaThis.createBufferedImage(rangeThis, center.getX()-10,center.getY()-10, center.getX()+10, center.getY()+10);
+		BufferedImage biNext = iaNext.createBufferedImage(rangeNext, center.getX()-10,center.getY()-10, center.getX()+10, center.getY()+10);
+		biPrevious = scale(biPrevious, 10.0);
+		biThis = scale(biThis, 10.0);
+		biNext = scale(biNext , 10.0);
+		int delta = rangeThis.getMax()-rangeThis.getMin();
+		MinMaxCounter rangePreviousA = new MinMaxCounter(rangePrevious.getMin(), rangePrevious.getMin()+delta, 1, 1);
+		MinMaxCounter rangeThisA = new MinMaxCounter(rangeThis.getMin(), rangeThis.getMin()+delta, 1, 1);
+		MinMaxCounter rangeNextA = new MinMaxCounter(rangeNext.getMin(), rangeNext.getMin()+delta, 1, 1);
+		BufferedImage biPreviousA = iaPrevious.createBufferedImage(rangePreviousA, center.getX()-10,center.getY()-10, center.getX()+10, center.getY()+10);
+		BufferedImage biThisA = iaThis.createBufferedImage(rangeThisA, center.getX()-10,center.getY()-10, center.getX()+10, center.getY()+10);
+		BufferedImage biNextA = iaNext.createBufferedImage(rangeNextA, center.getX()-10,center.getY()-10, center.getX()+10, center.getY()+10);
+		biPreviousA = scale(biPreviousA, 10.0);
+		biThisA = scale(biThisA, 10.0);
+		biNextA = scale(biNextA , 10.0);
+		BufferedImage[] images = {
+				biPreviousG, biThisG, biNextG, 
+				biPrevious, biThis, biNext,
+				biPreviousA, biThisA, biNextA
+			};
+		new ShowMultipleCompImage(iaThis.getFilename(), 3, 3, images);
 	}
 
 	private void showCompare3Details(ImageAnalyzer iaPrevious, ImageAnalyzer iaThis, ImageAnalyzer iaNext, Pos center) {
