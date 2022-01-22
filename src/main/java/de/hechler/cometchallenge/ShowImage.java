@@ -15,13 +15,13 @@ import javax.swing.WindowConstants;
 public class ShowImage
 {
 
-  public ShowImage(final BufferedImage image)
+  public ShowImage(final String title, final BufferedImage image)
   {
     SwingUtilities.invokeLater(new Runnable()
     {
       public void run()
       {
-        JFrame editorFrame = new JFrame("Image Demo");
+        JFrame editorFrame = new JFrame(title);
         editorFrame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         
         ImageIcon imageIcon = new ImageIcon(image);

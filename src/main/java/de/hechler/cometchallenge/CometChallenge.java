@@ -11,7 +11,13 @@ import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.logging.Handler;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 import ij.ImagePlus;
@@ -21,11 +27,45 @@ import ij.process.ShortProcessor;
 
 public class CometChallenge {
 
+
 	public final static String DEFAULT_INPUT_FOLDER = "C:\\DEV\\topcoder\\train-sample\\cmt0030";
 
+	
+	private final static Logger logger = Logger.getLogger(CometChallenge.class.getName());
+	static {
+		// System.setProperty("java.util.logging.SimpleFormatter.format", "%4$s: %5$s [%1$tc]%n");
+		System.setProperty("java.util.logging.SimpleFormatter.format", "%5$s%n");
+		Logger root = Logger.getLogger("");
+	    root.setLevel(Level.FINE);
+		for (Handler handler : root.getHandlers()) {
+			handler.setLevel(Level.FINE);
+		}
+	}
+	
+	private Map<String, Pos> cometPositionForFilename;
+	
+	private final static String COMETPOS_RX = "^\\s*[-0-9]+\\s+([0-9:]+)\\s+([0-9]+[.]fts)\\s+([0-9.]+)\\s+([0-9.]+)\\s+([0-9.an]+)\\s*$";
+	
 	public void processFolder(Path folder) {
 		try {
-
+			cometPositionForFilename = new LinkedHashMap<>();
+			List<String> cometLines = Files.readAllLines(folder.resolve(folder.getFileName().toString()+".txt"));
+			for (String cometLine:cometLines) {
+				if (cometLine.trim().startsWith("#") || cometLine.trim().isEmpty()) {
+					continue;
+				}
+				if (!cometLine.matches(COMETPOS_RX)) {
+					throw new RuntimeException("invalid line '"+cometLine+"'");
+				}
+				String time = cometLine.replaceFirst(COMETPOS_RX, "$1");
+				String filename = cometLine.replaceFirst(COMETPOS_RX, "$2");
+				double xPos = Double.parseDouble(cometLine.replaceFirst(COMETPOS_RX, "$3"));
+				double yPos = Double.parseDouble(cometLine.replaceFirst(COMETPOS_RX, "$4"));
+				cometPositionForFilename.put(filename, new Pos((int)xPos, (int)yPos));
+			}
+			System.out.println(cometPositionForFilename);
+			
+			
 			List<Path> files = Files.list(folder).filter(p -> p.getFileName().toString().endsWith(".fts"))
 					.collect(Collectors.toList());
 			for (Path file : files) {
@@ -53,7 +93,8 @@ public class CometChallenge {
 	}
 
 	private List<Pos> processFile(Path file) {
-		System.out.println("processing "+file);
+		String filename = file.getFileName().toString();
+		logger.info("processing "+filename);
 		FITS_Reader reader = new FITS_Reader();
 		reader.run(file.toString());
 		ImagePlus imp = (ImagePlus)reader;
@@ -71,31 +112,50 @@ public class CometChallenge {
 		}
 		ImageAnalyzer ia = new ImageAnalyzer(matrix);
 		
-		//ia.sub(33826);
-		
-		//ia.checkCentrum(908, 1018);
-		//ia.checkCentrum(909, 1018);
-		List<Pos> centers = ia.findCenters();
-		System.out.println(centers);
-
-//		showDetails(ia, new Pos(909,1018));
-		
-		for (Pos center:centers) {
-//			showDetails(ia, center);
-		}
-		
-		// 909.10 1018.10
+		Pos cometPos = cometPositionForFilename.get(filename);
+//		if (filename.equals("22721520.fts")) {
+//			Pos correctedCometPos = searchMax(ia, cometPos.getX()-10, cometPos.getY()-10, cometPos.getX()+10, cometPos.getY()+10);
+//		}
+		Pos correctedCometPos = searchMax(ia, cometPos.getX()-10, cometPos.getY()-10, cometPos.getX()+10, cometPos.getY()+10);
+		//Pos correctedCometPos = searchMax(ia, cometPos.getX()-5, cometPos.getY()-5, cometPos.getX()+5, cometPos.getY()+5);
+		logger.info(cometPos + " -> " + correctedCometPos);
+		showDetails(filename, ia, correctedCometPos);
+		ia.checkCentrum(correctedCometPos.getX(), correctedCometPos.getY());
 		// showRange(ia, 900,1010, 920, 1023);
+
+		//List<Pos> centers = ia.findCenters();
+		//logger.info(centers.toString());
+		//for (Pos center:centers) {
+		//	showDetails(ia, center);
+		//}
+		
+		List<Pos> centers = new ArrayList<>();
+		centers.add(correctedCometPos);
 		return centers;
 	}
 
-	private void showDetails(ImageAnalyzer ia, Pos center) {
-		System.out.println("");
-		System.out.println("------------ CENTER "+center);
+	private Pos searchMax(ImageAnalyzer ia, int fromX, int fromY, int toX, int toY) {
+		int maxLight = -1;
+		Pos result = null;
+		for (int y=fromY; y<=toY; y++) {
+			for (int x=fromX; x<=toX; x++) {
+				int p = ia.get(x, y);
+				if (p>maxLight) {
+					maxLight = p;
+					result = new Pos(x, y);
+				}
+			}
+		}
+		return result;
+	}
+
+	private void showDetails(String filename, ImageAnalyzer ia, Pos center) {
+		logger.fine("");
+		logger.fine("------------ CENTER "+center);
 		showRange(ia, center.getX()-5,center.getY()-5, center.getX()+5, center.getY()+5);
 		BufferedImage bi = ia.createBufferedImage(center.getX()-10,center.getY()-10, center.getX()+10, center.getY()+10);
 		bi = scale(bi, 10.0);
-		new ShowImage(bi);
+		new ShowImage(filename, bi);
 	}
 
 	private BufferedImage scale(BufferedImage bi, double factor) {
@@ -117,14 +177,15 @@ public class CometChallenge {
 				maxP = Math.max(maxP, p);
 			}
 		}
-		System.out.println("minP="+minP+", maxP="+maxP);
+		logger.fine("minP="+minP+", maxP="+maxP);
 		int len = Integer.toString(maxP-minP).length();
 		for (int y = fromY; y<=toY; y++) {
+			StringBuilder line = new StringBuilder();
 			for (int x = fromX; x<=toX; x++) {
 				int p = ia.get(x, y);
-				System.out.print(num(p-minP, len)+" ");
+				line.append(num(p-minP, len)+" ");
 			}
-			System.out.println();
+			logger.fine(line.toString());
 		}
 	}
 

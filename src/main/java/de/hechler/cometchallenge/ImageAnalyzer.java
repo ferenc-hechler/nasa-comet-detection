@@ -1,13 +1,15 @@
 package de.hechler.cometchallenge;
 
-import java.awt.Graphics;
 import java.awt.image.BufferedImage;
 import java.awt.image.WritableRaster;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Logger;
 
 public class ImageAnalyzer {
 
+	private final static Logger logger = Logger.getLogger(ImageAnalyzer.class.getName());
+	
 	private int[][] matrix;
 	private int width;
 	private int height;
@@ -80,13 +82,13 @@ public class ImageAnalyzer {
 			return false;
 		}
 		
-//		System.out.println("("+x+","+y+")");
-//		System.out.println("P="+p);
-//
-//		System.out.println("D1="+d1);
-//		System.out.println("D2="+d2);
-//		System.out.println("D3="+d3);
-//		System.out.println("D4="+d4);
+		logger.fine("("+x+","+y+")");
+		logger.fine("P="+p);
+
+		logger.fine("D1="+d1);
+		logger.fine("D2="+d2);
+		logger.fine("D3="+d3);
+		logger.fine("D4="+d4);
 
 		return true;
 	}
