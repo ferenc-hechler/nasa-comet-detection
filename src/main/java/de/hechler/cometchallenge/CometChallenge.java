@@ -28,7 +28,7 @@ import ij.process.ShortProcessor;
 public class CometChallenge {
 
 
-	public final static String DEFAULT_INPUT_FOLDER = "C:\\DEV\\topcoder\\train-sample\\cmt0030";
+	public final static String DEFAULT_INPUT_FOLDER = "C:\\DEV\\topcoder\\train-sample\\cmt0007";
 
 	
 	private final static Logger logger = Logger.getLogger(CometChallenge.class.getName());
@@ -211,10 +211,10 @@ public class CometChallenge {
 		logger.fine("------------ CENTER "+center);
 		showRange(iaThis, center.getX()-5,center.getY()-5, center.getX()+5, center.getY()+5);
 
-		int fromX = center.getX()-10;
-		int toX = center.getX()+10;
-		int fromY = center.getY()-10;
-		int toY = center.getY()+10;
+		int fromX = center.getX()-15;
+		int toX = center.getX()+15;
+		int fromY = center.getY()-15;
+		int toY = center.getY()+15;
 
 		MinMaxCounter rangePrevious = iaPrevious.calcMinMax(fromX,fromY, toX,toY);
 		MinMaxCounter rangeThis = iaThis.calcMinMax(fromX,fromY, toX,toY);
