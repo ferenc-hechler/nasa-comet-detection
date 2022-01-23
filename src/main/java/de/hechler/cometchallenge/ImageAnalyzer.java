@@ -162,4 +162,15 @@ public class ImageAnalyzer {
 		return result;
 	}
 
+	public double checkComet(int x, int y) {
+		MinMaxCounter center1MinMax = calcMinMax(x-1,y-1, x+1,y+1);
+		MinMaxCounter outer4MinMax = countNeighbours(x, y,  4);
+//		logger.info("CENTER1: "+center1MinMax);
+//		logger.info("OUTER4: "+outer4MinMax);
+		double centerDist = center1MinMax.getAvg()-outer4MinMax.getMin();
+		double outerDist = outer4MinMax.getAvg()-outer4MinMax.getMin();
+		double factorCenter2Outer = outerDist==0.0?centerDist : centerDist/outerDist;
+		return factorCenter2Outer;
+	}
+
 }

@@ -5,6 +5,7 @@ import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBuffer;
 import java.awt.image.Raster;
+import java.awt.image.WritableRaster;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintStream;
@@ -12,9 +13,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Handler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -86,6 +92,7 @@ public class CometChallenge {
 				List<Pos> spots = runAnalysis(lastImage, thisImage, nextImage);
 				String csvFilename = files.get(i).toString().replace(".fts", "")+"-spots.csv";
 				writeCSV(csvFilename, spots);
+				showSpots(thisImage.getFilename(), spots);
 				
 				lastImage = thisImage;
 				thisImage = nextImage;
@@ -95,16 +102,86 @@ public class CometChallenge {
 		}
 	}
 
+	private void showSpots(String filename, List<Pos> spots) {
+		int[] gray = new int[1];
+		int scale = 2;
+		int imgWH = 1024/scale;
+		BufferedImage image = new BufferedImage(imgWH, imgWH, BufferedImage.TYPE_BYTE_GRAY);
+		WritableRaster raster = image.getRaster();
+		gray[0] = 0;
+		for (int y=0; y<imgWH; y++) {
+			for (int x=0; x<imgWH; x++) {
+				raster.setPixel(x, y, gray);
+			}
+		}
+		gray[0] = 255;
+		for (Pos spot:spots) {
+			raster.setPixel(spot.getX()/scale, spot.getY()/scale, gray);
+		}
+		new ShowImage(filename, image);
+	}
+
 	private List<Pos> runAnalysis(ImageAnalyzer lastImage, ImageAnalyzer thisImage, ImageAnalyzer nextImage) {
 		Pos cometPos = cometPositionForFilename.get(thisImage.getFilename());
 		Pos correctedCometPos = searchMax(thisImage, cometPos.getX()-5, cometPos.getY()-5, cometPos.getX()+5, cometPos.getY()+5);
-		correctedCometPos = cometPos;
-		logger.info(cometPos + " -> " + correctedCometPos);
-		showCompare9Details(lastImage, thisImage, nextImage, correctedCometPos);
-		thisImage.checkCentrum(correctedCometPos.getX(), correctedCometPos.getY());
-		List<Pos> centers = new ArrayList<>();
-		centers.add(correctedCometPos);
+//		correctedCometPos = cometPos;
+//		logger.info(cometPos + " -> " + correctedCometPos);
+//		showCompare9Details(lastImage, thisImage, nextImage, correctedCometPos);
+//		thisImage.checkCentrum(correctedCometPos.getX(), correctedCometPos.getY());
+		List<Pos> centers = searchAllComets(lastImage, thisImage, nextImage);
+		logger.info("---- "+thisImage.getFilename()+" ---");
+		logger.info("TO BE FOUND: "+cometPos);
+		logger.info("DETECTED:    "+centers);
+		if (centers.contains(cometPos)) {
+			logger.info("!!! FOUND ORIGINAL !!!");
+		}
+		if (centers.contains(correctedCometPos)) {
+			logger.info("!!! FOUND CORRECTED POSITION !!!");
+		}
+		logger.info("-----------------------------------");
+		logger.info("#centers: "+ centers.size());
+		centers = concentrate(centers, 2);
+		logger.info("#centers(concentrated): "+ centers.size());
+		logger.info("CONTRACTED:    "+centers);
+		logger.info("-----------------------------------");
 		return centers;
+	}
+
+	private List<Pos> concentrate(List<Pos> centers, int mhDist) {
+		Set<Pos> centersPos = new LinkedHashSet<>(centers);
+		final Map<Pos, Set<Pos>> clusters = new LinkedHashMap<>();
+		centersPos.forEach(p -> {
+			Set<Pos> sp = new HashSet<>();
+			sp.add(p);
+			clusters.put(p, sp);
+		});	
+		while (!centersPos.isEmpty()) {
+			Pos centerPos = centersPos.iterator().next();
+			centersPos.remove(centerPos);
+			Iterator<Pos> otherCenterIter = centersPos.iterator();
+			while (otherCenterIter.hasNext()) {
+				Pos otherCenterPos = otherCenterIter.next();
+				if (centerPos.getManhattenDist(otherCenterPos) <= 2) {
+					final Set<Pos> sp1 = clusters.get(centerPos);
+					Set<Pos> sp2 = clusters.get(otherCenterPos);
+					sp1.addAll(sp2);
+					sp2.forEach(p -> clusters.put(p, sp1));
+				}
+			}
+		}
+		Set<Pos> result = new LinkedHashSet<>();
+		clusters.values().forEach(sp -> result.add(calcAveragePos(sp)));
+		return new ArrayList<>(result);
+	}
+
+	private Pos calcAveragePos(Set<Pos> posList) {
+		if (posList.size() == 1) {
+			return posList.iterator().next();
+		}
+		final Pos sum = new Pos(0,0);
+		posList.forEach(p -> sum.add(p));
+		int cnt = posList.size(); 
+		return new Pos((sum.getX()+cnt/2)/cnt,(sum.getY()+cnt/2)/cnt);
 	}
 
 	private ImageAnalyzer readFile(Path path) {
@@ -206,6 +283,29 @@ public class CometChallenge {
 		return result;
 	}
 
+	private List<Pos> searchAllComets(ImageAnalyzer iaPrevious, ImageAnalyzer iaThis, ImageAnalyzer iaNext) {
+		List<Pos> result = new ArrayList<>();
+		for (int y=0; y<1024; y++) {
+			for (int x=0; x<1024; x++) {
+				double probaIsComet = iaThis.checkComet(x,y);
+				if (probaIsComet<4.0) {
+					continue;
+				}
+				double previosProbaIsComet = iaPrevious.checkComet(x,y);
+				if (previosProbaIsComet>=1.6) {
+					continue;
+				}
+				double nextProbaIsComet = iaNext.checkComet(x,y);
+				if (nextProbaIsComet>=1.6) {
+					continue;
+				}
+				result.add(new Pos(x,y));
+			}
+		}
+		return result;
+	}
+
+	
 	private void showCompare9Details(ImageAnalyzer iaPrevious, ImageAnalyzer iaThis, ImageAnalyzer iaNext, Pos center) {
 		logger.fine("");
 		logger.fine("------------ CENTER "+center);
@@ -254,6 +354,22 @@ public class CometChallenge {
 				biPreviousA, biThisA, biNextA
 			};
 		new ShowMultipleCompImage(iaThis.getFilename(), 3, 3, images);
+
+		logger.info("--- "+iaThis.getFilename()+" ---");
+		double probaIsComet = iaThis.checkComet(center.getX(),center.getY());
+		logger.info("ISCOMTPROBA: "+probaIsComet);
+		logger.info("--------------------------------");
+		double previosProbaIsComet = iaPrevious.checkComet(center.getX(),center.getY());
+		logger.info("PREVIOUS: "+previosProbaIsComet);
+		logger.info("--------------------------------");
+		double nextProbaIsComet = iaNext.checkComet(center.getX(),center.getY());
+		logger.info("NEXT: "+nextProbaIsComet);
+		logger.info("--------------------------------");
+		if ((probaIsComet > 2.0) && (previosProbaIsComet <2.0) && (nextProbaIsComet <2.0)) {
+			logger.info("THIS IS A COMET");
+		}
+		return;
+		
 	}
 
 	private void showCompare3Details(ImageAnalyzer iaPrevious, ImageAnalyzer iaThis, ImageAnalyzer iaNext, Pos center) {

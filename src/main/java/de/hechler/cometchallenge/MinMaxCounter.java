@@ -58,6 +58,10 @@ public class MinMaxCounter {
 		return count == 0 ? 0 : total / count;
 	}
 	
+	public double getDAvg() {
+		return count == 0 ? 0.0 : ((double)total)/count;
+	}
+	
 	@Override public String toString() { 
 		return "[min="+min+",max="+max+",avg="+getAvg()+",cnt="+count+"]"; 
 	}
