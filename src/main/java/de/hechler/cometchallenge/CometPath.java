@@ -4,54 +4,102 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import de.hechler.cometchallenge.geometry.Pos;
+
 public class CometPath {
 
 	private List<CometPos> cometPositions;
-	private long lastDX;
-	private long lastDY;
-	private long lastDT;
 	
 	public CometPath(Date timestamp, Pos pos) {
 		cometPositions = new ArrayList<>();
 		cometPositions.add(new CometPos(timestamp, pos));
-		lastDX = 0;
-		lastDY = 0;
-		lastDT = 0;
 	}
 
 	public CometPath(CometPath other) {
 		cometPositions = new ArrayList<>(other.cometPositions);
-		lastDX = other.lastDX;
-		lastDY = other.lastDY;
-		lastDT = other.lastDT;
 	}
 
 	public CometPath createNewIfInRange(Date timestamp, Pos pos) {
-		CometPos lastCP = cometPositions.get(cometPositions.size()-1);
 		if (cometPositions.size() > 1) {
-			long dt = timestamp.getTime()-lastCP.getTimestamp().getTime();
-			int dx = (int)(lastDX*dt/lastDT);
-			int dy = (int)(lastDY*dt/lastDT);
-			Pos expectedPos = new Pos(lastCP.getPosition().getX()+dx,lastCP.getPosition().getY()+dy);
-			int mhDist = lastCP.getPosition().getManhattenDist(expectedPos);
-			int mhWrong = pos.getManhattenDist(expectedPos);
-			int mhTolerated = 5; // Math.min(5, 1+mhDist/2); 
+			// TODO: handle rotation (e.g. comet0001)
+			CometPos firstCP = cometPositions.get(0);
+			CometPos lastCP = cometPositions.get(cometPositions.size()-1);
+			double DT = lastCP.getTimestamp().getTime()-firstCP.getTimestamp().getTime();
+			double DX = lastCP.getPosition().getX()-firstCP.getPosition().getX();
+			double DY = lastCP.getPosition().getY()-firstCP.getPosition().getY();
+			double dt = timestamp.getTime()-firstCP.getTimestamp().getTime();
+			double dx = DX*dt/DT;
+			double dy = DY*dt/DT;
+			Pos expectedPos = new Pos(firstCP.getPosition().getX()+dx,firstCP.getPosition().getY()+dy);
+			double mhDist = firstCP.getPosition().getManhattenDist(expectedPos);
+			double mhWrong = pos.getManhattenDist(expectedPos);
+			double mhTolerated = 5.0; // Math.min(5, 1+mhDist/2); 
 			if (mhWrong > mhTolerated) {
+				return null;
+			}
+			double sqDistFromLine = pos.getSQDistFromLine(firstCP.getPosition(), expectedPos);
+			double sqTolerated = 2.0;
+			if (sqDistFromLine > sqTolerated) {
 				return null;
 			}
 		}
 		CometPath result = new CometPath(this); 
-		result.cometPositions.add(new CometPos(timestamp, pos));
-		result.lastDX = pos.getX()-lastCP.getPosition().getX();
-		result.lastDY = pos.getY()-lastCP.getPosition().getY();
-		result.lastDT = timestamp.getTime()-lastCP.getTimestamp().getTime();
+		result.add(timestamp, pos);
 		return result;
+	}
+	
+
+	public void add(Date timestamp, Pos cometPos) {
+		cometPositions.add(new CometPos(timestamp, cometPos));
 	}
 	
 	public int getLength() {
 		return cometPositions.size();
 	}
+	
+	public CometPos getCometPosition(int i) {
+		return cometPositions.get(i);
+	}
 
+	public double getDistError() {
+		if (cometPositions.size() <= 2) {
+			return 0;
+		}
+		CometPos firstCP = cometPositions.get(0);
+		CometPos lastCP = cometPositions.get(cometPositions.size()-1);
+		double DT = lastCP.getTimestamp().getTime() - firstCP.getTimestamp().getTime();
+		double DX = lastCP.getPosition().getX() - firstCP.getPosition().getX();
+		double DY = lastCP.getPosition().getY() - firstCP.getPosition().getY();
+		double result = 0;
+		for (int i=1; i<cometPositions.size()-2; i++) {
+			CometPos testCP = cometPositions.get(i);
+			double dt = testCP.getTimestamp().getTime() - firstCP.getTimestamp().getTime();
+			double dx = DX*dt/DT;
+			double dy = DY*dt/DT;
+			Pos expectedPos = new Pos(firstCP.getPosition().getX()+dx, firstCP.getPosition().getY()+dy);
+			result += expectedPos.getSQDist(testCP.getPosition());
+		}
+		return result/(cometPositions.size()-2);
+	}
+
+	public double getLineError() {
+		if (cometPositions.size() <= 2) {
+			return 0;
+		}
+		CometPos firstCP = cometPositions.get(0);
+		CometPos lastCP = cometPositions.get(cometPositions.size()-1);
+		double DT = lastCP.getTimestamp().getTime() - firstCP.getTimestamp().getTime();
+		double DX = lastCP.getPosition().getX() - firstCP.getPosition().getX();
+		double DY = lastCP.getPosition().getY() - firstCP.getPosition().getY();
+		double result = 0;
+		for (int i=1; i<cometPositions.size()-2; i++) {
+			CometPos testCP = cometPositions.get(i);
+			result += testCP.getPosition().getSQDistFromLine(firstCP.getPosition(), lastCP.getPosition());
+		}
+		return result/(cometPositions.size()-2);
+	}
+
+	
 	@Override
 	public String toString() {
 		return cometPositions.toString();

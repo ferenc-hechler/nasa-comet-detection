@@ -3,6 +3,8 @@ package de.hechler.cometchallenge;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+import de.hechler.cometchallenge.geometry.Pos;
+
 public class CometPos {
 
 	private Date timestamp;

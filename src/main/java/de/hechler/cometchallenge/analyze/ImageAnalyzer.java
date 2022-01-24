@@ -1,41 +1,52 @@
-package de.hechler.cometchallenge;
+package de.hechler.cometchallenge.analyze;
 
 import java.awt.image.BufferedImage;
 import java.awt.image.WritableRaster;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.logging.Logger;
 
+import de.hechler.cometchallenge.MinMaxCounter;
+import de.hechler.cometchallenge.geometry.Pos;
+
 public class ImageAnalyzer {
 
-	private final static Logger logger = Logger.getLogger(ImageAnalyzer.class.getName());
+	private static final Logger logger = Logger.getLogger(ImageAnalyzer.class.getName());
 	
 	private Path path;
-	private CometPos labeledCometPos;
+	private Date timestamp;
+	private Pos labeledCometPos;
+	private Double vmag;
 	
 	private int[][] matrix;
 	private int width;
 	private int height;
 	
+	// calculated data
+	private List<Pos> spots;
 	
 	
-	public ImageAnalyzer(Path path, int[][] matrix, CometPos labeledCometPos) {
+	
+	public ImageAnalyzer(Path path, Date timestamp, Pos labeledCometPos, Double vmag, int[][] matrix) {
 		this.path = path;
-		this.matrix = matrix;
+		this.timestamp = timestamp;
 		this.labeledCometPos = labeledCometPos;
+		this.vmag = vmag;
+		this.matrix = matrix;
 		this.height = matrix.length;
 		this.width = matrix[0].length;
 	}
 
-	public Path getPath() {
-		return path;
-	}
-	
-	public String getFilename() {
-		return path==null?"?":path.getFileName().toString();
-	}
+	public Path getPath() { return path; }
+	public String getFilename() { return path==null?"?":path.getFileName().toString(); }
+	public Date getTimestamp() { return timestamp; }
+	public Pos getLabeledCometPos() { return labeledCometPos; }
+	public double getVmag() { return vmag; }
+	public int[][] getMatrix() { return matrix; }
+	public void setSpots(List<Pos> spots) { this.spots = spots; }
+	public List<Pos> getSpots() { return spots; }
+
 	
 	public int get(int x, int y) {
 		if (isInRange(x, y)) {
@@ -46,6 +57,13 @@ public class ImageAnalyzer {
 		return matrix[borderY][borderX];
 	}
 
+	/**
+	 * count neighbours on surroundg square with distance dist from the center. 
+	 * @param x
+	 * @param y
+	 * @param dist
+	 * @return
+	 */
 	public MinMaxCounter countNeighbours(int x, int y, int dist) {
 		MinMaxCounter result = new MinMaxCounter();
 		for (int n=-dist; n<=dist; n++) {
@@ -59,6 +77,14 @@ public class ImageAnalyzer {
 		return result;
 	}
 
+	/**
+	 * count every pixel in range (including fromXY, toXy).
+	 * @param fromX
+	 * @param fromY
+	 * @param toX
+	 * @param toY
+	 * @return
+	 */
 	public MinMaxCounter countRange(int fromX, int fromY, int toX, int toY) {
 		MinMaxCounter result = new MinMaxCounter();
 		for (int y=fromY; y<=toY; y++) {
@@ -68,68 +94,6 @@ public class ImageAnalyzer {
 		}
 		return result;
 	}
-
-
-	public boolean checkCentrum(int x, int y) {
-		int p = get(x,y);
-		MinMaxCounter d1 = countNeighbours(x, y, 1);
-		if (d1.getAvg()>p) {
-			return false;
-		}
-		MinMaxCounter d2 = countNeighbours(x, y, 2);
-		if ((d2.getMin() >= d1.getMin()) || 
-			(d2.getMax() >= d1.getMax()) ||  
-			(d2.getAvg() >= d1.getAvg())) {
-			return false;
-		}
-		MinMaxCounter d3 = countNeighbours(x, y, 3);
-		if ((d3.getMin() >= d2.getMin()) || 
-			(d3.getMax() >= d2.getMax()) ||  
-			(d3.getAvg() >= d2.getAvg())) {
-			return false;
-		}
-		MinMaxCounter d4 = countNeighbours(x, y, 4);
-		if ((d4.getMin() >= d3.getMin()) || 
-			(d4.getMax() >= d3.getMax()) ||  
-			(d4.getAvg() >= d3.getAvg())) {
-			return false;
-		}
-
-		if (d4.getMax() > d1.getMin()) {
-			return false;
-		}
-		
-		logger.fine("("+x+","+y+")");
-		logger.fine("P="+p);
-
-		logger.fine("D1="+d1);
-		logger.fine("D2="+d2);
-		logger.fine("D3="+d3);
-		logger.fine("D4="+d4);
-
-		return true;
-	}
-
-	public List<Pos> findCenters() {
-		List<Pos> result = new ArrayList<>();
-		for (int y=0; y<height; y++) {
-			for (int x=0; x<width; x++) {
-				if (checkCentrum(x, y)) {
-					result.add(new Pos(x, y));
-				}
-			}
-		}
-		return result;
-	}
-
-	public void sub(int n) {
-		for (int y=0; y<height; y++) {
-			for (int x=0; x<width; x++) {
-				matrix[y][x] -= n;
-			}
-		}
-	}
-
 
 	public BufferedImage createBufferedImage(int fromX, int fromY, int toX, int toY) {
 		MinMaxCounter range = calcMinMax(fromX, fromY, toX, toY);
@@ -176,12 +140,4 @@ public class ImageAnalyzer {
 		return factorCenter2Outer;
 	}
 
-	public Date getTimestamp() {
-		return labeledCometPos.getTimestamp();
-	}
-	
-	public Pos getLabeledCometPos() {
-		return labeledCometPos.getPosition();
-	}
-	
 }
