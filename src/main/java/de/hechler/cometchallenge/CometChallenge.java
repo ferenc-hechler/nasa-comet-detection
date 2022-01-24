@@ -12,8 +12,10 @@ import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Collection;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -48,9 +50,10 @@ public class CometChallenge {
 		}
 	}
 	
-	private Map<String, Pos> cometPositionForFilename;
+	private Map<String, CometPos> cometPositionForFilename;
 	
-	private final static String COMETPOS_RX = "^\\s*[-0-9]+\\s+([0-9:]+)\\s+([0-9]+[.]fts)\\s+([0-9.]+)\\s+([0-9.]+)\\s+([0-9.an]+)\\s*$";
+	private final static String COMETPOS_RX = "^\\s*([-0-9]+\\s+[0-9:]+)\\s+([0-9]+[.]fts)\\s+([0-9.]+)\\s+([0-9.]+)\\s+([0-9.an]+)\\s*$";
+	private final static String TIMESTAMP_FORMAT = "YYYY-MM-dd HH:mm:ss";
 	
 	public void processFolder(Path folder) {
 		try {
@@ -64,10 +67,11 @@ public class CometChallenge {
 					throw new RuntimeException("invalid line '"+cometLine+"'");
 				}
 				String time = cometLine.replaceFirst(COMETPOS_RX, "$1");
+				Date timestamp = parseTimestamp(time); 
 				String filename = cometLine.replaceFirst(COMETPOS_RX, "$2");
 				double xPos = Double.parseDouble(cometLine.replaceFirst(COMETPOS_RX, "$3"));
 				double yPos = Double.parseDouble(cometLine.replaceFirst(COMETPOS_RX, "$4"));
-				cometPositionForFilename.put(filename, new Pos((int)(xPos+0.5), (int)(yPos+0.5)));
+				cometPositionForFilename.put(filename, new CometPos(timestamp, new Pos((int)(xPos+0.5), (int)(yPos+0.5))));
 			}
 			System.out.println(cometPositionForFilename);
 			
@@ -78,26 +82,65 @@ public class CometChallenge {
 			ImageAnalyzer thisImage = null;
 			ImageAnalyzer nextImage = null;
 			// edge case first image: use next image as previous image
-			lastImage = readFile(files.get(1));
-			thisImage = readFile(files.get(0));
+			lastImage = readFile(files.get(1), cometPositionForFilename);
+			thisImage = readFile(files.get(0), cometPositionForFilename);
+			
+			List<CometPath> cometPaths = new ArrayList<>();
+			List<CometPath> finishedCometPaths = new ArrayList<>();
+			
 			for (int i=0; i<files.size(); i++) {
 				if (i==files.size()-1) {
 					// edge case last image: use previous image as next image
 					nextImage = lastImage;
 				}
 				else {
-					nextImage = readFile(files.get(i+1));
+					nextImage = readFile(files.get(i+1), cometPositionForFilename);
 				}
 				
 				List<Pos> spots = runAnalysis(lastImage, thisImage, nextImage);
 				String csvFilename = files.get(i).toString().replace(".fts", "")+"-spots.csv";
 				writeCSV(csvFilename, spots);
-				showSpots(thisImage.getFilename(), spots);
+//				showSpots(thisImage.getFilename(), spots);
+				
+				Date timestamp = thisImage.getTimestamp();
+				List<CometPath> lastCometPaths = cometPaths;
+				cometPaths = new ArrayList<>();
+
+				for (Pos spot:spots) {
+					cometPaths.add(new CometPath(timestamp, spot));
+				}
+				for (CometPath lastCometPath:lastCometPaths) {
+					boolean found = false;
+					for (Pos spot:spots) {
+						CometPath next = lastCometPath.createNewIfInRange(timestamp, spot);
+						if (next != null) {
+							found = true;
+							cometPaths.add(next);
+						}
+					}
+					if (!found) {
+						finishedCometPaths.add(lastCometPath);
+					}
+				}
 				
 				lastImage = thisImage;
 				thisImage = nextImage;
 			}
+			finishedCometPaths.addAll(cometPaths);
+			for (CometPath finishedCometPath:finishedCometPaths) {
+				if (finishedCometPath.getLength()>5) {
+					logger.info("FOUND COMET PATH: "+finishedCometPath);
+				}
+			}
 		} catch (IOException e) {
+			throw new RuntimeException(e.toString(), e);
+		}
+	}
+
+	private Date parseTimestamp(String time) {
+		try {
+			return new SimpleDateFormat(TIMESTAMP_FORMAT).parse(time);
+		} catch (ParseException e) {
 			throw new RuntimeException(e.toString(), e);
 		}
 	}
@@ -122,7 +165,8 @@ public class CometChallenge {
 	}
 
 	private List<Pos> runAnalysis(ImageAnalyzer lastImage, ImageAnalyzer thisImage, ImageAnalyzer nextImage) {
-		Pos cometPos = cometPositionForFilename.get(thisImage.getFilename());
+		CometPos labeledCometPos = cometPositionForFilename.get(thisImage.getFilename());
+		Pos cometPos = labeledCometPos.getPosition();
 		Pos correctedCometPos = searchMax(thisImage, cometPos.getX()-5, cometPos.getY()-5, cometPos.getX()+5, cometPos.getY()+5);
 //		correctedCometPos = cometPos;
 //		logger.info(cometPos + " -> " + correctedCometPos);
@@ -184,7 +228,7 @@ public class CometChallenge {
 		return new Pos((sum.getX()+cnt/2)/cnt,(sum.getY()+cnt/2)/cnt);
 	}
 
-	private ImageAnalyzer readFile(Path path) {
+	private ImageAnalyzer readFile(Path path, Map<String, CometPos> cometPositionForFilename) {
 		String filename = path.getFileName().toString();
 		logger.info("reading "+filename);
 		FITS_Reader reader = new FITS_Reader();
@@ -203,7 +247,7 @@ public class CometChallenge {
 				matrix[h-1-y][x] = dataBuffer.getElem(h*y+x);
 			}
 		}
-		return new ImageAnalyzer(path, matrix);
+		return new ImageAnalyzer(path, matrix, cometPositionForFilename.get(path.getFileName().toString()));
 	}
 
 	private void writeCSV(String csvFilename, List<Pos> spots) {

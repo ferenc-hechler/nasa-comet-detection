@@ -4,6 +4,7 @@ import java.awt.image.BufferedImage;
 import java.awt.image.WritableRaster;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.logging.Logger;
 
@@ -12,16 +13,18 @@ public class ImageAnalyzer {
 	private final static Logger logger = Logger.getLogger(ImageAnalyzer.class.getName());
 	
 	private Path path;
-
+	private CometPos labeledCometPos;
+	
 	private int[][] matrix;
 	private int width;
 	private int height;
 	
 	
 	
-	public ImageAnalyzer(Path path, int[][] matrix) {
+	public ImageAnalyzer(Path path, int[][] matrix, CometPos labeledCometPos) {
 		this.path = path;
 		this.matrix = matrix;
+		this.labeledCometPos = labeledCometPos;
 		this.height = matrix.length;
 		this.width = matrix[0].length;
 	}
@@ -173,4 +176,12 @@ public class ImageAnalyzer {
 		return factorCenter2Outer;
 	}
 
+	public Date getTimestamp() {
+		return labeledCometPos.getTimestamp();
+	}
+	
+	public Pos getLabeledCometPos() {
+		return labeledCometPos.getPosition();
+	}
+	
 }
