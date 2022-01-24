@@ -7,6 +7,7 @@ import de.hechler.cometchallenge.CometPath;
 import de.hechler.cometchallenge.CometPos;
 import de.hechler.cometchallenge.analyze.ImageAnalyzer;
 import de.hechler.cometchallenge.analyze.SequenceAnalyzer;
+import de.hechler.cometchallenge.geometry.Pos;
 import de.hechler.cometchallenge.utils.Utils;
 
 public class CometPathsController implements ImageController {
@@ -75,8 +76,9 @@ public class CometPathsController implements ImageController {
 		case DETAIL: {
 			double distError = getCurrentCometPath().getDistError();
 			double lineError = getCurrentCometPath().getLineError();
-			String qual = " QD["+distError+"] QL["+lineError+"]";
-			return "DETAIL: " + (currentImage+1) + "/" + getCurrentCometPath().getLength() + qual;
+			Pos pos = getCurrentCometPath().getCometPosition(currentImage).getPosition();
+			String qual = "QD["+distError+"] QL["+lineError+"]";
+			return "DETAIL: " + (currentImage+1) + "/" + getCurrentCometPath().getLength() + " "+ pos + " " + qual;
 		}
 		case SPOT: {
 			return "SPOT: " + (currentImage+1) + "/" + getCurrentCometPath().getLength();

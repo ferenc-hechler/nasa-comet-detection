@@ -3,7 +3,10 @@ package de.hechler.cometchallenge;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
+import de.hechler.cometchallenge.analyze.ImageAnalyzer;
+import de.hechler.cometchallenge.analyze.SequenceAnalyzer;
 import de.hechler.cometchallenge.geometry.Pos;
 
 public class CometPath {
@@ -103,6 +106,24 @@ public class CometPath {
 	@Override
 	public String toString() {
 		return cometPositions.toString();
+	}
+
+	public String toSubmissionText(SequenceAnalyzer analyzer) {
+		StringBuilder result = new StringBuilder();
+		String folderName = analyzer.getImageAnalyzer(0).getPath().getParent().getFileName().toString();
+		result.append(folderName);
+		for (CometPos cometPos:cometPositions) {
+			ImageAnalyzer ia = analyzer.getImageAnalyzerForTimestamp(cometPos.getTimestamp());
+			String xStr = String.format(Locale.ROOT, "%.2f", cometPos.getPosition().getX());
+			String yStr = String.format(Locale.ROOT, "%.2f", cometPos.getPosition().getY());
+			result.append(",").append(ia.getFilename())
+					.append(",").append(xStr)
+					.append(",").append(yStr);
+		}
+		double confidence = 1.0/(1.0+getDistError()+getLineError());
+		String confStr = String.format(Locale.ROOT, "%.2f", confidence);
+		result.append(",").append(confStr);
+		return result.toString();
 	}
 	
 }

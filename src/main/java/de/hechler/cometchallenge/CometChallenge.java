@@ -16,6 +16,7 @@ public class CometChallenge {
 
 
 //	public final static String DEFAULT_INPUT_FOLDER = "C:\\DEV\\topcoder\\train-sample\\cmt0007";
+//	public final static String DEFAULT_INPUT_FOLDER = "C:\\DEV\\NASA\\train-sample\\cmt0030";
 	public final static String DEFAULT_INPUT_FOLDER = "C:\\DEV\\NASA\\train-sample\\cmt0003";
 
 	
@@ -53,8 +54,10 @@ public class CometChallenge {
 		try {
 			Thread.sleep(1000);
 		} catch (InterruptedException e) {}
-		for (CometPath detectedCometPath:detectedCometPaths) {
-			logger.info("FOUND COMET PATH: "+detectedCometPath);
+		
+		for (int i=0; i<detectedCometPaths.size(); i++) {
+			CometPath detectedCometPath = detectedCometPaths.get(i);
+			logger.info("CP-"+i+": "+detectedCometPath.toSubmissionText(analyzer));
 		}
 	}
 
