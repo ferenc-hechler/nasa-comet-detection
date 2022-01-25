@@ -78,6 +78,22 @@ public class SequenceAnalyzer {
 		return timestamp2imageMap.get(timestamp);
 	}
 	
+	public ImageAnalyzer getPreviousImageAnalyzer(ImageAnalyzer ia) {
+		int idx = images.indexOf(ia);
+		if (idx==0) {
+			return null;
+		}
+		return images.get(idx-1);
+	}
+	
+	public ImageAnalyzer getNextImageAnalyzer(ImageAnalyzer ia) {
+		int idx = images.indexOf(ia);
+		if (idx==images.size()-1) {
+			return null;
+		}
+		return images.get(idx+1);
+	}
+	
 	public void detectCometSpots() {
 		ImageAnalyzer lastImage = null;
 		ImageAnalyzer thisImage = null;

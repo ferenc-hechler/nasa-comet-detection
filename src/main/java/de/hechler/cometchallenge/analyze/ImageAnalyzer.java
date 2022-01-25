@@ -108,7 +108,7 @@ public class ImageAnalyzer {
 		WritableRaster raster = result.getRaster();
 		for (int y=fromY; y<=toY; y++) {
 			for (int x=fromX; x<=toX; x++) {
-				gray[0] = (int) (scale*(get(x,y)-offset));
+				gray[0] = Math.max(0, Math.min(255, (int) (scale*(get(x,y)-offset))));
 				raster.setPixel(x-fromX, y-fromY, gray);
 			}
 		}

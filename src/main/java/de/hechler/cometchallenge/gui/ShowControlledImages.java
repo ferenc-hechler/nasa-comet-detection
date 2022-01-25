@@ -65,7 +65,7 @@ public class ShowControlledImages implements ImageWindow {
 		lbImage = new JLabel();
 		window.getContentPane().add(lbImage, BorderLayout.CENTER);
 
-		updateControls();
+		updateControlsASync();
 		
 		window.pack();
 		window.setLocationRelativeTo(null);
@@ -73,11 +73,17 @@ public class ShowControlledImages implements ImageWindow {
 	}
 
 
+	
 	@Override
 	public void updateControls() {
+		SwingUtilities.invokeLater(() -> updateControlsASync());
+	}
+
+	public void updateControlsASync() {
 		btLeft.setEnabled(controller.hasLeft()); 
 		btRight.setEnabled(controller.hasRight()); 
 		lbCurrentInfo.setText(controller.getCurrentInfo());
 		lbImage.setIcon(new ImageIcon(controller.getCurrentImage()));
 	}
+
 }

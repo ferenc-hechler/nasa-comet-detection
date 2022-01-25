@@ -1,10 +1,12 @@
 package de.hechler.cometchallenge.gui;
 
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.util.List;
 
 import de.hechler.cometchallenge.CometPath;
 import de.hechler.cometchallenge.CometPos;
+import de.hechler.cometchallenge.MinMaxCounter;
 import de.hechler.cometchallenge.analyze.ImageAnalyzer;
 import de.hechler.cometchallenge.analyze.SequenceAnalyzer;
 import de.hechler.cometchallenge.geometry.Pos;
@@ -110,6 +112,78 @@ public class CometPathsController implements ImageController {
 	}
 	
 	public BufferedImage getDetailImage() {
+		CometPos cp = getCurrentCometPath().getCometPosition(currentImage);
+		ImageAnalyzer iaThis = analyzer.getImageAnalyzerForTimestamp(cp.getTimestamp());
+		ImageAnalyzer iaPrevious = analyzer.getPreviousImageAnalyzer(iaThis);
+		ImageAnalyzer iaNext = analyzer.getNextImageAnalyzer(iaThis);
+		int x = (int)cp.getPosition().getX();
+		int y = (int)cp.getPosition().getY();
+		
+		int delta = 7;
+		int fromX = x-delta;
+		int toX = x+delta;
+		int fromY = y-delta;
+		int toY = y+delta;
+		
+		int width = toX-fromX+1;
+		int height = toY-fromY+1;
+		int totalWidth = 3*width;
+		int totalHeight = 3*width;
+		
+        BufferedImage concatImage = new BufferedImage(totalWidth, totalHeight, BufferedImage.TYPE_BYTE_GRAY);
+        Graphics2D g2d = concatImage.createGraphics();
+
+        int currentHeight = 0;
+        for (int row=0; row<3; row++) {
+            MinMaxCounter rangeT = iaThis.calcMinMax(fromX, fromY, toX, toY);
+            MinMaxCounter rangeN = iaNext == null ? null : iaNext.calcMinMax(fromX, fromY, toX, toY); 
+            MinMaxCounter rangeP = iaPrevious == null ? null : iaPrevious.calcMinMax(fromX, fromY, toX, toY);
+            if (row == 0) {
+            	// calibrate over all images
+                if (rangeN != null) {
+                	rangeT.update(rangeT);
+                	rangeN = rangeT;
+                }
+                if (rangeP != null) {
+                	rangeT.update(rangeP);
+                	rangeP = rangeT;
+                }
+            }
+            else if (row == 1) {
+            	// keep each image calibrated by its own values
+            }
+            else {
+            	// keep the delta from min
+            	int diff = rangeT.getMax()-rangeT.getMin();
+                if (rangeN != null) {
+                	rangeN = new MinMaxCounter(rangeN.getMin(), rangeN.getMin()+diff, 1,1);
+                }
+                if (rangeP != null) {
+                	rangeP = new MinMaxCounter(rangeP.getMin(), rangeP.getMin()+diff, 1,1);
+                }
+            }
+        
+	        BufferedImage bi;
+	        if (iaPrevious != null) {
+	        	bi = iaPrevious.createBufferedImage(rangeP, fromX, fromY, toX, toY);
+				g2d.drawImage(bi, 0, currentHeight, null);
+	        }
+	    	bi = iaThis.createBufferedImage(rangeT, fromX, fromY, toX, toY);
+			g2d.drawImage(bi, width, currentHeight, null);
+	        if (iaNext != null) {
+	        	bi = iaNext.createBufferedImage(rangeN, fromX, fromY, toX, toY);
+				g2d.drawImage(bi, 2*width, currentHeight, null);
+	        }
+	    	currentHeight += height;
+	    }
+        
+        g2d.dispose();
+        
+        concatImage = Utils.scale(concatImage, 10.0);
+		return concatImage;
+	}
+	
+	public BufferedImage getSimpleDetailImage() {
 		CometPos cp = getCurrentCometPath().getCometPosition(currentImage);
 		ImageAnalyzer ia = analyzer.getImageAnalyzerForTimestamp(cp.getTimestamp());
 		int x = (int)cp.getPosition().getX();
