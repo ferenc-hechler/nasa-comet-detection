@@ -9,6 +9,7 @@ import java.util.logging.Logger;
 import de.hechler.cometchallenge.CometPath;
 import de.hechler.cometchallenge.CometPos;
 import de.hechler.cometchallenge.MinMaxCounter;
+import de.hechler.cometchallenge.MinMaxStat;
 import de.hechler.cometchallenge.analyze.ImageAnalyzer;
 import de.hechler.cometchallenge.analyze.SequenceAnalyzer;
 import de.hechler.cometchallenge.geometry.Pos;
@@ -169,7 +170,55 @@ public class CometPathsController implements ImageController {
 			g2d.drawImage(bi, c*width, r*height, null);
         }
 
-        double[][] matrixNC = new double[height][width]; 
+//        BufferedImage biDiff = calcDiffImage(iaThis, fromX, toX, fromY, toY);
+//		int c=currentImage%cols;
+//    	int r=currentImage/cols;
+//		g2d.drawImage(biDiff, c*width, r*height, null);
+    	
+        
+        g2d.dispose();
+
+    	logger.info("--- current "+(currentImage+1)+" ---");
+        for (int i=0; i<analyzer.getLength(); i++) {
+        	ImageAnalyzer ia = analyzer.getImageAnalyzer(i);
+            double factor = 1.0/ia.getExpTime();
+        	MinMaxStat allMM = ia.calcMinMaxStat(fromX, fromY, toX, toY);
+            int centerDist = 1;
+    		MinMaxStat centerMM = ia.calcMinMaxStat(x-centerDist, y-centerDist, x+centerDist, y+centerDist);
+//        	logger.info("IMG-"+(i+1)+".SIGMA:  center="+centerMM.getSigma()+"  all="+allMM.getSigma());
+        	logger.info("IMG-"+(i+1)+".STDERR: center="+centerMM.getStdErr()+"  all="+allMM.getStdErr());
+//        	logger.info("--- IMAGE "+(i+1)+" ---");
+//        	logger.info("EXPTIME: "+ia.getExpTime());
+//        	logger.info("CENTER:  "+(ia.get(x, y)));
+//    		MinMaxStat rangeMM = ia.calcMinMaxStat(fromX, fromY, toX, toY);
+//        	logger.info("SIGMA:   "+(rangeMM.getSigma()));
+//        	for (int d=1;d<=5; d++) {
+//        		MinMaxStat surroundingMM = ia.surroundingStat(x, y, d);
+//            	logger.info(" D"+d+"SIGMA: "+(surroundingMM.getSigma()));
+//        	}
+//        	for (int d=1;d<=5; d++) {
+//        		MinMaxStat surroundingMM = ia.surroundingStat(x, y, d);
+//            	logger.info("  D"+d+"AVG:   "+(surroundingMM.getAvg()));
+//        	}
+//        	for (int d=1;d<=5; d++) {
+//        		MinMaxStat surroundingMM = ia.surroundingStat(x, y, d);
+//            	logger.info(" D"+d+"MIN:   "+(surroundingMM.getMin()));
+//        	}
+//        	for (int d=1;d<=5; d++) {
+//        		MinMaxStat surroundingMM = ia.surroundingStat(x, y, d);
+//            	logger.info("  D"+d+"MAX:   "+(surroundingMM.getMax()));
+//        	}
+        }
+        
+        
+        concatImage = Utils.scale(concatImage, 8.0);
+		return concatImage;
+	}
+
+	private BufferedImage calcDiffImage(ImageAnalyzer iaThis, int fromX, int toX, int fromY, int toY) {
+		int width = toX-fromX+1;
+		int height = toY-fromY+1;
+		double[][] matrixNC = new double[height][width]; 
         double[][] matrixC = new double[height][width];
         double cntOther = analyzer.getLength()-1;
         
@@ -201,39 +250,7 @@ public class CometPathsController implements ImageController {
 				raster.setPixel(px-fromX, py-fromY, gray);
 			}
 		}
-
-		int c=currentImage%cols;
-    	int r=currentImage/cols;
-		g2d.drawImage(biDiff, c*width, r*height, null);
-    	
-        
-        g2d.dispose();
-
-        for (int i=0; i<analyzer.getLength(); i++) {
-        	ImageAnalyzer ia = analyzer.getImageAnalyzer(i);
-            double factor = 1.0/ia.getExpTime();
-        	MinMaxCounter mm = ia.calcMinMax(fromX, fromY, toX, toY);
-        	int min = mm.getMin();
-        	logger.info("--- IMAGE "+(i+1)+" ---");
-        	logger.info("EXPTIME: "+ia.getExpTime());
-        	logger.info("CENTER:  "+(factor*ia.get(x, y)));
-        	for (int d=1;d<=5; d++) {
-        		MinMaxCounter neighboursMM = ia.countNeighbours(x, y, d);
-            	logger.info("D"+d+"AVG:   "+(factor*neighboursMM.getAvg()));
-        	}
-        	for (int d=1;d<=5; d++) {
-        		MinMaxCounter neighboursMM = ia.countNeighbours(x, y, d);
-            	logger.info("D"+d+"MIN:   "+(factor*neighboursMM.getMin()));
-        	}
-        	for (int d=1;d<=5; d++) {
-        		MinMaxCounter neighboursMM = ia.countNeighbours(x, y, d);
-            	logger.info("D"+d+"MAX:   "+(factor*neighboursMM.getMax()));
-        	}
-        }
-        
-        
-        concatImage = Utils.scale(concatImage, 8.0);
-		return concatImage;
+		return biDiff;
 	}
 	
 	

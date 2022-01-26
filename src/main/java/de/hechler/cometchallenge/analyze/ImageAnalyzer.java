@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Properties;
 
 import de.hechler.cometchallenge.MinMaxCounter;
+import de.hechler.cometchallenge.MinMaxStat;
 import de.hechler.cometchallenge.geometry.Pos;
 
 public class ImageAnalyzer {
@@ -82,6 +83,19 @@ public class ImageAnalyzer {
 		return result;
 	}
 
+	public MinMaxStat surroundingStat(int x, int y, int dist) {
+		MinMaxStat result = new MinMaxStat();
+		for (int n=-dist; n<=dist; n++) {
+			result.update(get(x+n, y-dist));
+			result.update(get(x+n, y+dist));
+		}
+		for (int n=-dist+1; n<dist; n++) {
+			result.update(get(x-dist, y+n));
+			result.update(get(x+dist, y+n));
+		}
+		return result;
+	}
+
 	/**
 	 * count every pixel in range (including fromXY, toXy).
 	 * @param fromX
@@ -126,6 +140,16 @@ public class ImageAnalyzer {
 
 	public MinMaxCounter calcMinMax(int fromX, int fromY, int toX, int toY) {
 		MinMaxCounter result = new MinMaxCounter();
+		for (int y=fromY; y<=toY; y++) {
+			for (int x=fromX; x<=toX; x++) {
+				result.update(get(x,y));
+			}
+		}
+		return result;
+	}
+
+	public MinMaxStat calcMinMaxStat(int fromX, int fromY, int toX, int toY) {
+		MinMaxStat result = new MinMaxStat();
 		for (int y=fromY; y<=toY; y++) {
 			for (int x=fromX; x<=toX; x++) {
 				result.update(get(x,y));
