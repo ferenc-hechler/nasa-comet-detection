@@ -32,8 +32,12 @@ public class CometPathsController implements ImageController {
 	
 	private boolean showInfo;
 	
-	private BufferedImage specialImage;
+	private boolean showSpecialData;
 
+	private static final String SPECIALIMAGE_DATA = "SPECIALIMAGE";
+
+
+	
 	public CometPathsController(SequenceAnalyzer analyzer, List<CometPath> cometPaths) {
 		this.analyzer = analyzer;
 		this.cometPaths = cometPaths;
@@ -41,7 +45,7 @@ public class CometPathsController implements ImageController {
 		this.currentImage = 0;
 		this.currentCometPath = 0;
 		this.showInfo = false;
-		this.specialImage = null;
+		this.showSpecialData = false;
 	}
 
 	private CometPath getCurrentCometPath() {
@@ -108,10 +112,12 @@ public class CometPathsController implements ImageController {
 	}
 
 	public BufferedImage getCurrentImage() {
-		if (specialImage != null) {
-			BufferedImage result = specialImage;
-//			specialImage = null;
-			return result;
+		if (showSpecialData) {
+			ImageAnalyzer ia = getCurrentImageAnalyzer();
+			if (!ia.hasData(SPECIALIMAGE_DATA)) {
+				calculateSpecialData(ia);
+			}
+			return ia.getData(SPECIALIMAGE_DATA);
 		}
 		switch (overviewMode) {
 		case PATH: {
@@ -497,16 +503,27 @@ public class CometPathsController implements ImageController {
 	
 	@Override 
 	public void special(ImageWindow iw) {
-		if (specialImage != null) {
-			specialImage = null;
+		if (showSpecialData) {
+			showSpecialData = false;
 			iw.updateControls();
 			return;
 		}
-		
+		showSpecialData = true;
 		ImageAnalyzer ia = getCurrentImageAnalyzer();
+		if (!ia.hasData(SPECIALIMAGE_DATA)) {
+			calculateSpecialData(ia);
+		}
+		iw.updateControls();
+	}
+
+	private void calculateSpecialData(ImageAnalyzer ia) {
+
+		int dist = 5;
+		double pMin = 25.0;
+		double pMax = 50.0;
+		
 		double[][] matrix = new double[1024][1024];
 		MinMaxStat normalizeMMS = new MinMaxStat();
-		int dist = 5;
         for (int y=0; y<1024; y++) {
             for (int x=0; x<1024; x++) {
             	MinMaxStat localMMS = ia.calcMinMaxStat(x-dist, y-dist, x+dist, y+dist);
@@ -516,22 +533,25 @@ public class CometPathsController implements ImageController {
             }
         }
         
-        double q25 = normalizeMMS.getQuantil(25.0);
-        double q75 = normalizeMMS.getQuantil(75.0);
+        double qMin = normalizeMMS.getQuantil(pMin);
+        double qMax = normalizeMMS.getQuantil(pMax);
         
-        double offset = q25;
-        double scale = 255.0/(q75-q25+0.00001);
-        specialImage = new BufferedImage(1024, 1024, BufferedImage.TYPE_BYTE_GRAY);
-		WritableRaster raster = specialImage.getRaster();
+        double offset = qMin;
+        double scale = 255.0/(qMax-qMin+0.00001);
+        BufferedImage specialData = new BufferedImage(1024, 1024, BufferedImage.TYPE_BYTE_GRAY);
+		WritableRaster raster = specialData.getRaster();
 		int[] gray = new int[1];
         for (int y=0; y<1024; y++) {
             for (int x=0; x<1024; x++) {
-            	double value = Math.max(q25,  Math.min(q75, matrix[y][x]));
+            	double value = Math.max(qMin,  matrix[y][x]);
+            	if (value > qMax) {
+            		value = qMin;
+            	}
 				gray[0] = Math.max(0, Math.min(255, (int) (scale*(value-offset))));
 				raster.setPixel(x, y, gray);
 			}
 		}
-        iw.updateControls();
+        ia.setData(SPECIALIMAGE_DATA, specialData);
 	}
 
 

@@ -4,7 +4,9 @@ import java.awt.image.BufferedImage;
 import java.awt.image.WritableRaster;
 import java.nio.file.Path;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import de.hechler.cometchallenge.MinMaxCounter;
@@ -27,7 +29,8 @@ public class ImageAnalyzer {
 	
 	// calculated data
 	private List<Pos> spots;
-	
+
+	private Map<String, Object> data;
 	
 	
 	public ImageAnalyzer(Path path, Date timestamp, Pos labeledCometPos, Double vmag, int[][] matrix, Properties fitsProperties) {
@@ -40,6 +43,7 @@ public class ImageAnalyzer {
 		this.width = matrix[0].length;
 		this.fitsProperties = fitsProperties;
 		this.expTime = Double.parseDouble(((String)fitsProperties.get("Info")).replace("\r", " ").replace("\n", " ").replaceFirst(".*EXPTIME\\s*=([^/]*)/.*", "$1").trim());
+		this.data = new HashMap<>();
 	}
 
 	public Path getPath() { return path; }
@@ -167,6 +171,17 @@ public class ImageAnalyzer {
 		double outerDist = outer4MinMax.getAvg()-outer4MinMax.getMin();
 		double factorCenter2Outer = outerDist==0.0?centerDist : centerDist/outerDist;
 		return factorCenter2Outer;
+	}
+
+	public boolean hasData(String key) {
+		return data.containsKey(key);
+	}
+	public void setData(String key, Object value) {
+		data.put(key, value);
+	}
+	@SuppressWarnings("unchecked")
+	public <T> T getData(String key) {
+		return (T)data.get(key);
 	}
 
 }
