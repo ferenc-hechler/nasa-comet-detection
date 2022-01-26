@@ -86,4 +86,6 @@ public class CometPathController implements ImageController {
 		iw.updateControls();
 	}
 
+	@Override public void info(ImageWindow iw) {}
+
 }

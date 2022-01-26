@@ -5,15 +5,13 @@ import java.awt.image.WritableRaster;
 import java.nio.file.Path;
 import java.util.Date;
 import java.util.List;
-import java.util.logging.Logger;
+import java.util.Properties;
 
 import de.hechler.cometchallenge.MinMaxCounter;
 import de.hechler.cometchallenge.geometry.Pos;
 
 public class ImageAnalyzer {
 
-	private static final Logger logger = Logger.getLogger(ImageAnalyzer.class.getName());
-	
 	private Path path;
 	private Date timestamp;
 	private Pos labeledCometPos;
@@ -23,12 +21,15 @@ public class ImageAnalyzer {
 	private int width;
 	private int height;
 	
+	private Properties fitsProperties;
+	private double expTime;   // exposure time, normalize by dividing all pixel values by expTime. 
+	
 	// calculated data
 	private List<Pos> spots;
 	
 	
 	
-	public ImageAnalyzer(Path path, Date timestamp, Pos labeledCometPos, Double vmag, int[][] matrix) {
+	public ImageAnalyzer(Path path, Date timestamp, Pos labeledCometPos, Double vmag, int[][] matrix, Properties fitsProperties) {
 		this.path = path;
 		this.timestamp = timestamp;
 		this.labeledCometPos = labeledCometPos;
@@ -36,6 +37,8 @@ public class ImageAnalyzer {
 		this.matrix = matrix;
 		this.height = matrix.length;
 		this.width = matrix[0].length;
+		this.fitsProperties = fitsProperties;
+		this.expTime = Double.parseDouble(((String)fitsProperties.get("Info")).replace("\r", " ").replace("\n", " ").replaceFirst(".*EXPTIME\\s*=([^/]*)/.*", "$1").trim());
 	}
 
 	public Path getPath() { return path; }
@@ -44,6 +47,8 @@ public class ImageAnalyzer {
 	public Pos getLabeledCometPos() { return labeledCometPos; }
 	public double getVmag() { return vmag; }
 	public int[][] getMatrix() { return matrix; }
+	public String getProperty(String key) { return fitsProperties.getProperty(key); }
+	public double getExpTime() { return expTime; }
 	public void setSpots(List<Pos> spots) { this.spots = spots; }
 	public List<Pos> getSpots() { return spots; }
 

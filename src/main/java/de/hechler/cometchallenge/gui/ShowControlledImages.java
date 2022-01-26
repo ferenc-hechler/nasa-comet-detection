@@ -44,9 +44,9 @@ public class ShowControlledImages implements ImageWindow {
 		buttonPane.setBorder(BorderFactory.createEmptyBorder(0, 2, 2, 2));
 		window.getContentPane().add(buttonPane, BorderLayout.PAGE_START);
 
-		JButton btSwitch = new JButton("#");
-		btSwitch.addActionListener(ae -> controller.switchMode(ShowControlledImages.this));
-		buttonPane.add(btSwitch);
+		JButton btMode = new JButton("#");
+		btMode.addActionListener(ae -> controller.switchMode(ShowControlledImages.this));
+		buttonPane.add(btMode);
 
 		buttonPane.add(Box.createHorizontalStrut(10));
 
@@ -57,6 +57,12 @@ public class ShowControlledImages implements ImageWindow {
 		btRight = new JButton(">");
 		btRight.addActionListener(ae -> controller.right(ShowControlledImages.this));
 		buttonPane.add(btRight);
+
+		buttonPane.add(Box.createHorizontalStrut(10));
+
+		JButton btInfo = new JButton("(i)");
+		btInfo.addActionListener(ae -> controller.info(ShowControlledImages.this));
+		buttonPane.add(btInfo);
 
 		lbCurrentInfo = new JLabel();
 		buttonPane.add(lbCurrentInfo);

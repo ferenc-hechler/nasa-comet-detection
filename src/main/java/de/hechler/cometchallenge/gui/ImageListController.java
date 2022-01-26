@@ -47,9 +47,8 @@ public class ImageListController implements ImageController {
 		iw.updateControls();
 	}
 
-	@Override
-	public void switchMode(ImageWindow iw) {
-	}
+	@Override public void switchMode(ImageWindow iw) {}
+	@Override public void info(ImageWindow iw) {}
 
 
 

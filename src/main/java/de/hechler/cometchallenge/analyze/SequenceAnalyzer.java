@@ -1,7 +1,5 @@
 package de.hechler.cometchallenge.analyze;
 
-import java.awt.geom.AffineTransform;
-import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBuffer;
 import java.awt.image.Raster;
@@ -20,6 +18,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.logging.Logger;
 
@@ -40,6 +39,16 @@ public class SequenceAnalyzer {
 	
 	private static final String COMETPOS_RX = "^\\s*([-0-9]+\\s+[0-9:]+)\\s+([0-9]+[.]fts)\\s+([0-9.]+)\\s+([0-9.]+)\\s+([0-9.an]+)\\s*$";
 	private static final String TIMESTAMP_FORMAT = "YYYY-MM-dd HH:mm:ss";
+	
+	private static class ReadGrayscaleResult {
+		int[][] matrix;
+		Properties properties;
+		public ReadGrayscaleResult(int[][] matrix, Properties properties) {
+			this.matrix = matrix;
+			this.properties = properties;
+		}
+		
+	}
 	
 	public void readSequence(Path folder) {
 		
@@ -66,9 +75,9 @@ public class SequenceAnalyzer {
 			String vMagText = line.replaceFirst(COMETPOS_RX, "$5");
 			Double vMag = vMagText.equals("nan") ? null : Double.parseDouble(vMagText);
 			
-			int[][] matrix = readRawGrayscale(path);
+			ReadGrayscaleResult rgResult = readRawGrayscale(path);
 			
-			ImageAnalyzer ia = new ImageAnalyzer(path, timestamp, new Pos(xPos, yPos), vMag, matrix);
+			ImageAnalyzer ia = new ImageAnalyzer(path, timestamp, new Pos(xPos, yPos), vMag, rgResult.matrix, rgResult.properties);
 			timestamp2imageMap.put(ia.getTimestamp(), ia);
 			images.add(ia);
 		}
@@ -78,8 +87,12 @@ public class SequenceAnalyzer {
 		return timestamp2imageMap.get(timestamp);
 	}
 	
+	public int getImageAnalyzerIndex(ImageAnalyzer ia) {
+		return images.indexOf(ia);
+	}
+	
 	public ImageAnalyzer getPreviousImageAnalyzer(ImageAnalyzer ia) {
-		int idx = images.indexOf(ia);
+		int idx = getImageAnalyzerIndex(ia);
 		if (idx==0) {
 			return null;
 		}
@@ -87,7 +100,7 @@ public class SequenceAnalyzer {
 	}
 	
 	public ImageAnalyzer getNextImageAnalyzer(ImageAnalyzer ia) {
-		int idx = images.indexOf(ia);
+		int idx = getImageAnalyzerIndex(ia);
 		if (idx==images.size()-1) {
 			return null;
 		}
@@ -225,7 +238,7 @@ public class SequenceAnalyzer {
 		return new Pos((sum.getX()+cnt/2)/cnt,(sum.getY()+cnt/2)/cnt);
 	}
 
-	private int[][] readRawGrayscale(Path path) {
+	private ReadGrayscaleResult readRawGrayscale(Path path) {
 		logger.info("reading "+path.getFileName().toString());
 		FITS_Reader reader = new FITS_Reader();
 		reader.run(path.toString());
@@ -243,7 +256,7 @@ public class SequenceAnalyzer {
 				matrix[h-1-y][x] = dataBuffer.getElem(h*y+x);
 			}
 		}
-		return matrix;
+		return new ReadGrayscaleResult(matrix, imp.getProperties());
 	}
 
 
@@ -300,15 +313,6 @@ public class SequenceAnalyzer {
 	}
 
 	
-
-	private BufferedImage scale(BufferedImage bi, double factor) {
-		BufferedImage result = new BufferedImage((int)(bi.getWidth()*factor), (int)(bi.getHeight()*factor), BufferedImage.TYPE_BYTE_GRAY);
-		AffineTransform at = new AffineTransform();
-		at.scale(factor, factor);
-		AffineTransformOp scaleOp = new AffineTransformOp(at, AffineTransformOp.TYPE_NEAREST_NEIGHBOR);
-		result = scaleOp.filter(bi, result);
-		return result;
-	}
 
 	private void showRange(ImageAnalyzer ia, int fromX, int fromY, int toX, int toY) {
 		int minP = 65536;

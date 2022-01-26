@@ -2,7 +2,9 @@ package de.hechler.cometchallenge.gui;
 
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.awt.image.WritableRaster;
 import java.util.List;
+import java.util.logging.Logger;
 
 import de.hechler.cometchallenge.CometPath;
 import de.hechler.cometchallenge.CometPos;
@@ -14,6 +16,8 @@ import de.hechler.cometchallenge.utils.Utils;
 
 public class CometPathsController implements ImageController {
 
+	private static final Logger logger = Logger.getLogger(CometPathsController.class.getName());
+
 	private SequenceAnalyzer analyzer;
 	
 	private List<CometPath> cometPaths;
@@ -22,6 +26,8 @@ public class CometPathsController implements ImageController {
 	
 	private enum MODE { PATH, DETAIL, SPOT }
 	private MODE overviewMode;
+	
+	private boolean showInfo;
 
 	public CometPathsController(SequenceAnalyzer analyzer, List<CometPath> cometPaths) {
 		this.analyzer = analyzer;
@@ -29,6 +35,7 @@ public class CometPathsController implements ImageController {
 		this.overviewMode = MODE.PATH;
 		this.currentImage = 0;
 		this.currentCometPath = 0;
+		this.showInfo = false;
 	}
 
 	private CometPath getCurrentCometPath() {
@@ -110,8 +117,128 @@ public class CometPathsController implements ImageController {
 		BufferedImage bi = Utils.createSpots(getCurrentCometPath(), 1.0);
 		return bi;
 	}
-	
+
 	public BufferedImage getDetailImage() {
+		if (showInfo) {
+			return getDetailImageSequence();
+		}
+		return getDetailImage3x3();
+	}
+	
+	
+	public BufferedImage getDetailImageSequence() {
+		CometPos cp = getCurrentCometPath().getCometPosition(currentImage);
+		ImageAnalyzer iaThis = analyzer.getImageAnalyzerForTimestamp(cp.getTimestamp());
+
+		int delta = 5;
+		int cols = 3;
+
+		int x = (int)cp.getPosition().getX();
+		int y = (int)cp.getPosition().getY();
+		int fromX = x-delta;
+		int toX = x+delta;
+		int fromY = y-delta;
+		int toY = y+delta;
+		
+		int width = toX-fromX+1;
+		int height = toY-fromY+1;
+
+		int rows = (analyzer.getLength()+cols-1) / cols;
+		
+		int totalWidth = cols*width;
+		int totalHeight = rows*width;
+
+        BufferedImage concatImage = new BufferedImage(totalWidth, totalHeight, BufferedImage.TYPE_BYTE_GRAY);
+
+        MinMaxCounter range = new MinMaxCounter();
+        for (int i=0; i<analyzer.getLength(); i++) {
+        	ImageAnalyzer ia = analyzer.getImageAnalyzer(i);
+        	range.update(ia.calcMinMax(fromX, fromY, toX, toY));
+        }
+        
+        range = iaThis.calcMinMax(fromX, fromY, toX, toY); 
+        
+        logger.info("RANGE: "+range);
+        
+        Graphics2D g2d = concatImage.createGraphics();
+        for (int i=0; i<analyzer.getLength(); i++) {
+        	ImageAnalyzer ia = analyzer.getImageAnalyzer(i);
+        	BufferedImage bi = ia.createBufferedImage(range, fromX, fromY, toX, toY);
+        	int c=i%cols;
+        	int r=i/cols;
+			g2d.drawImage(bi, c*width, r*height, null);
+        }
+
+        double[][] matrixNC = new double[height][width]; 
+        double[][] matrixC = new double[height][width];
+        double cntOther = analyzer.getLength()-1;
+        
+        MinMaxCounter diffRange = new MinMaxCounter();
+        for (int py=fromY; py<=toY; py++) {
+            for (int px=fromX; px<=toX; px++) {
+                for (int i=0; i<analyzer.getLength(); i++) {
+                	ImageAnalyzer ia = analyzer.getImageAnalyzer(i);
+                	if (ia == iaThis) {
+                		matrixC[py-fromY][px-fromX] = 1.0*ia.get(px, py)/ia.getExpTime();
+                	}
+                	else {
+                		matrixNC[py-fromY][px-fromX] += 1.0*ia.get(px, py)/ia.getExpTime();
+                	}
+                }    
+                matrixC[py-fromY][px-fromX] -= matrixNC[py-fromY][px-fromX]/cntOther;
+                diffRange.update((int)(100.0*matrixC[py-fromY][px-fromX]));
+            }
+        }
+
+        double offset = 0.01*diffRange.getMin();
+        double scale = 255.0/(0.01*(diffRange.getMax()-diffRange.getMin())+0.00001);
+        int[] gray = new int[1];
+        BufferedImage biDiff = new BufferedImage(width, height, BufferedImage.TYPE_BYTE_GRAY);
+		WritableRaster raster = biDiff.getRaster();
+		for (int py=fromY; py<=toY; py++) {
+			for (int px=fromX; px<=toX; px++) {
+				gray[0] = Math.max(0, Math.min(255, (int) (scale*(matrixC[py-fromY][px-fromX]-offset))));
+				raster.setPixel(px-fromX, py-fromY, gray);
+			}
+		}
+
+		int c=currentImage%cols;
+    	int r=currentImage/cols;
+		g2d.drawImage(biDiff, c*width, r*height, null);
+    	
+        
+        g2d.dispose();
+
+        for (int i=0; i<analyzer.getLength(); i++) {
+        	ImageAnalyzer ia = analyzer.getImageAnalyzer(i);
+            double factor = 1.0/ia.getExpTime();
+        	MinMaxCounter mm = ia.calcMinMax(fromX, fromY, toX, toY);
+        	int min = mm.getMin();
+        	logger.info("--- IMAGE "+(i+1)+" ---");
+        	logger.info("EXPTIME: "+ia.getExpTime());
+        	logger.info("CENTER:  "+(factor*ia.get(x, y)));
+        	for (int d=1;d<=5; d++) {
+        		MinMaxCounter neighboursMM = ia.countNeighbours(x, y, d);
+            	logger.info("D"+d+"AVG:   "+(factor*neighboursMM.getAvg()));
+        	}
+        	for (int d=1;d<=5; d++) {
+        		MinMaxCounter neighboursMM = ia.countNeighbours(x, y, d);
+            	logger.info("D"+d+"MIN:   "+(factor*neighboursMM.getMin()));
+        	}
+        	for (int d=1;d<=5; d++) {
+        		MinMaxCounter neighboursMM = ia.countNeighbours(x, y, d);
+            	logger.info("D"+d+"MAX:   "+(factor*neighboursMM.getMax()));
+        	}
+        }
+        
+        
+        concatImage = Utils.scale(concatImage, 8.0);
+		return concatImage;
+	}
+	
+	
+
+	public BufferedImage getDetailImage3x3() {
 		CometPos cp = getCurrentCometPath().getCometPosition(currentImage);
 		ImageAnalyzer iaThis = analyzer.getImageAnalyzerForTimestamp(cp.getTimestamp());
 		ImageAnalyzer iaPrevious = analyzer.getPreviousImageAnalyzer(iaThis);
@@ -284,5 +411,12 @@ public class CometPathsController implements ImageController {
 		}
 		iw.updateControls();
 	}
+
+	@Override
+	public void info(ImageWindow iw) {
+		showInfo = !showInfo;
+		iw.updateControls();
+	}
+
 
 }
