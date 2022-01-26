@@ -5,6 +5,7 @@ import java.awt.image.BufferedImage;
 import java.awt.image.WritableRaster;
 import java.util.List;
 import java.util.logging.Logger;
+import java.awt.Composite;
 
 import de.hechler.cometchallenge.CometPath;
 import de.hechler.cometchallenge.CometPos;
@@ -14,6 +15,7 @@ import de.hechler.cometchallenge.analyze.ImageAnalyzer;
 import de.hechler.cometchallenge.analyze.SequenceAnalyzer;
 import de.hechler.cometchallenge.geometry.Pos;
 import de.hechler.cometchallenge.utils.Utils;
+import java.awt.AlphaComposite;
 
 public class CometPathsController implements ImageController {
 
@@ -41,6 +43,10 @@ public class CometPathsController implements ImageController {
 
 	private CometPath getCurrentCometPath() {
 		return cometPaths.get(currentCometPath);
+	}
+	
+	private ImageAnalyzer getCurrentImageAnalyzer() {
+		return analyzer.getImageAnalyzer(currentImage);
 	}
 	
 	public boolean hasLeft() {
@@ -115,10 +121,35 @@ public class CometPathsController implements ImageController {
 	}
 	
 	public BufferedImage getOverviewImage() {
-		BufferedImage bi = Utils.createSpots(getCurrentCometPath(), 1.0);
+		if (showInfo) {
+			return getOverviewImageBlack();
+		}
+		return getOverviewImageTransparent();
+	}
+	private BufferedImage getOverviewImageBlack() {
+		BufferedImage bi = Utils.createSpots(getCurrentCometPath(), 1.0);	
 		return bi;
 	}
+	private BufferedImage getOverviewImageTransparent() {
+        BufferedImage biCometSpots = getOverviewImageBlack();
 
+        BufferedImage result = getCurrentImageAnalyzer().createBufferedImage(0, 0, 1023, 1023);
+        Graphics2D g2d = result.createGraphics();
+        Composite originalComposite = g2d.getComposite();
+        g2d.setComposite(makeComposite(0.5f));
+		g2d.drawImage(biCometSpots, 0, 0, null);
+        g2d.setComposite(originalComposite);        
+		g2d.dispose();
+		
+		return result;
+	}
+	private AlphaComposite makeComposite(float alpha) {
+		int type = AlphaComposite.SRC_OVER;
+		return (AlphaComposite.getInstance(type, alpha));
+	}
+
+
+	
 	public BufferedImage getDetailImage() {
 		if (showInfo) {
 			return getDetailImageSequence();
@@ -178,15 +209,15 @@ public class CometPathsController implements ImageController {
         
         g2d.dispose();
 
-    	logger.info("--- current "+(currentImage+1)+" ---");
+    	logger.info("--- current "+(currentImage+1)+" (ExpTime="+getCurrentImageAnalyzer().getExpTime()+") ---");
         for (int i=0; i<analyzer.getLength(); i++) {
         	ImageAnalyzer ia = analyzer.getImageAnalyzer(i);
             double factor = 1.0/ia.getExpTime();
         	MinMaxStat allMM = ia.calcMinMaxStat(fromX, fromY, toX, toY);
             int centerDist = 1;
     		MinMaxStat centerMM = ia.calcMinMaxStat(x-centerDist, y-centerDist, x+centerDist, y+centerDist);
-//        	logger.info("IMG-"+(i+1)+".SIGMA:  center="+centerMM.getSigma()+"  all="+allMM.getSigma());
-        	logger.info("IMG-"+(i+1)+".STDERR: center="+centerMM.getStdErr()+"  all="+allMM.getStdErr());
+        	logger.info("IMG-"+(i+1)+".SIGMA:  center="+centerMM.getSigma()+"  all="+allMM.getSigma());
+//        	logger.info("IMG-"+(i+1)+".STDERR: center="+centerMM.getStdErr()+"  all="+allMM.getStdErr());
 //        	logger.info("--- IMAGE "+(i+1)+" ---");
 //        	logger.info("EXPTIME: "+ia.getExpTime());
 //        	logger.info("CENTER:  "+(ia.get(x, y)));
@@ -337,12 +368,33 @@ public class CometPathsController implements ImageController {
 		bi = Utils.scale(bi, 10.0);
 		return bi;
 	}
+
 	
 	public BufferedImage getAllSpotImage() {
+		if (showInfo) {
+			return getAllSpotImageBlack();
+		}
+		return getAllSpotImageTransparent();
+	}
+	public BufferedImage getAllSpotImageBlack() {
 		ImageAnalyzer ia = analyzer.getImageAnalyzerForTimestamp(getCurrentCometPath().getCometPosition(currentImage).getTimestamp());
 		BufferedImage bi = Utils.createSpots(ia.getSpots(), 1.0);
 		return bi;
 	}
+	private BufferedImage getAllSpotImageTransparent() {
+        BufferedImage biSpots = getAllSpotImageBlack();
+
+        BufferedImage result = getCurrentImageAnalyzer().createBufferedImage(0, 0, 1023, 1023);
+        Graphics2D g2d = result.createGraphics();
+        Composite originalComposite = g2d.getComposite();
+        g2d.setComposite(makeComposite(0.5f));
+		g2d.drawImage(biSpots, 0, 0, null);
+        g2d.setComposite(originalComposite);        
+		g2d.dispose();
+		
+		return result;
+	}
+
 	
 
 	public void left(ImageWindow iw) {
