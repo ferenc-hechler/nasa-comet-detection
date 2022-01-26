@@ -31,6 +31,8 @@ public class CometPathsController implements ImageController {
 	private MODE overviewMode;
 	
 	private boolean showInfo;
+	
+	private BufferedImage specialImage;
 
 	public CometPathsController(SequenceAnalyzer analyzer, List<CometPath> cometPaths) {
 		this.analyzer = analyzer;
@@ -39,6 +41,7 @@ public class CometPathsController implements ImageController {
 		this.currentImage = 0;
 		this.currentCometPath = 0;
 		this.showInfo = false;
+		this.specialImage = null;
 	}
 
 	private CometPath getCurrentCometPath() {
@@ -105,6 +108,11 @@ public class CometPathsController implements ImageController {
 	}
 
 	public BufferedImage getCurrentImage() {
+		if (specialImage != null) {
+			BufferedImage result = specialImage;
+//			specialImage = null;
+			return result;
+		}
 		switch (overviewMode) {
 		case PATH: {
 			return getOverviewImage();
@@ -485,6 +493,45 @@ public class CometPathsController implements ImageController {
 	public void info(ImageWindow iw) {
 		showInfo = !showInfo;
 		iw.updateControls();
+	}
+	
+	@Override 
+	public void special(ImageWindow iw) {
+		if (specialImage != null) {
+			specialImage = null;
+			iw.updateControls();
+			return;
+		}
+		
+		ImageAnalyzer ia = getCurrentImageAnalyzer();
+		double[][] matrix = new double[1024][1024];
+		MinMaxStat normalizeMMS = new MinMaxStat();
+		int dist = 5;
+        for (int y=0; y<1024; y++) {
+            for (int x=0; x<1024; x++) {
+            	MinMaxStat localMMS = ia.calcMinMaxStat(x-dist, y-dist, x+dist, y+dist);
+            	double heat = localMMS.getSigma(); 
+            	normalizeMMS.update(heat);
+            	matrix[y][x] = heat;
+            }
+        }
+        
+        double q25 = normalizeMMS.getQuantil(25.0);
+        double q75 = normalizeMMS.getQuantil(75.0);
+        
+        double offset = q25;
+        double scale = 255.0/(q75-q25+0.00001);
+        specialImage = new BufferedImage(1024, 1024, BufferedImage.TYPE_BYTE_GRAY);
+		WritableRaster raster = specialImage.getRaster();
+		int[] gray = new int[1];
+        for (int y=0; y<1024; y++) {
+            for (int x=0; x<1024; x++) {
+            	double value = Math.max(q25,  Math.min(q75, matrix[y][x]));
+				gray[0] = Math.max(0, Math.min(255, (int) (scale*(value-offset))));
+				raster.setPixel(x, y, gray);
+			}
+		}
+        iw.updateControls();
 	}
 
 

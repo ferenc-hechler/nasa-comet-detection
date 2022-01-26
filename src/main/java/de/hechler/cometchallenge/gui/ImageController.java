@@ -12,6 +12,7 @@ public interface ImageController {
 
 	public void switchMode(ImageWindow iw);
 	public void info(ImageWindow iw);
+	public void special(ImageWindow iw);
 
 	public String getCurrentInfo();
 

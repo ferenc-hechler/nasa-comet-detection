@@ -87,5 +87,6 @@ public class CometPathController implements ImageController {
 	}
 
 	@Override public void info(ImageWindow iw) {}
+	@Override public void special(ImageWindow iw) {}
 
 }

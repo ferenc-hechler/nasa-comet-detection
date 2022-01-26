@@ -21,10 +21,10 @@ public class CometChallenge {
 
 
 //	public final static String DEFAULT_INPUT_FOLDER = "C:\\DEV\\NASA\\train-sample\\cmt0007";
-	public final static String DEFAULT_INPUT_FOLDER = "C:\\DEV\\NASA\\train-sample\\cmt0030";
+//	public final static String DEFAULT_INPUT_FOLDER = "C:\\DEV\\NASA\\train-sample\\cmt0030";
 //	public final static String DEFAULT_INPUT_FOLDER = "C:\\DEV\\NASA\\train-sample\\cmt0003";
 //	public final static String DEFAULT_INPUT_FOLDER = "C:\\DEV\\NASA\\train-sample\\cmt0006";
-//	public final static String DEFAULT_INPUT_FOLDER = "C:\\DEV\\NASA\\train-sample\\cmt0009";
+	public final static String DEFAULT_INPUT_FOLDER = "C:\\DEV\\NASA\\train-sample\\cmt0009";
 
 	
 	private final static Logger logger;

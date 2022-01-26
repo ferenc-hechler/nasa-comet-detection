@@ -64,6 +64,12 @@ public class ShowControlledImages implements ImageWindow {
 		btInfo.addActionListener(ae -> controller.info(ShowControlledImages.this));
 		buttonPane.add(btInfo);
 
+		JButton btSpecial = new JButton("(S)");
+		btSpecial.addActionListener(ae -> controller.special(ShowControlledImages.this));
+		buttonPane.add(btSpecial);
+
+		buttonPane.add(Box.createHorizontalStrut(10));
+
 		lbCurrentInfo = new JLabel();
 		buttonPane.add(lbCurrentInfo);
 

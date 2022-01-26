@@ -49,6 +49,7 @@ public class ImageListController implements ImageController {
 
 	@Override public void switchMode(ImageWindow iw) {}
 	@Override public void info(ImageWindow iw) {}
+	@Override public void special(ImageWindow iw) {}
 
 
 

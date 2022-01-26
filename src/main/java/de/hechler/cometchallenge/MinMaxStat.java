@@ -1,6 +1,7 @@
 package de.hechler.cometchallenge;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 public class MinMaxStat {
@@ -8,6 +9,7 @@ public class MinMaxStat {
 	private double min;
 	private double max;
 	private List<Double> values;
+	private boolean sorted;
 	private double total;
 
 	public MinMaxStat() {
@@ -19,6 +21,7 @@ public class MinMaxStat {
 		this.max = max;
 		this.values = values;
 		this.total = total;
+		this.sorted = false;
 	}
 
 	public MinMaxStat(MinMaxStat other) {
@@ -30,6 +33,7 @@ public class MinMaxStat {
 		max = Math.max(max, value);
 		values.add(value);
 		total += value;
+		sorted = false;
 		return this;
 	}
 
@@ -38,7 +42,17 @@ public class MinMaxStat {
 		max = Math.max(max, other.max);
 		values.addAll(other.values);
 		total += other.total;
+		sorted = false;
 		return this;
+	}
+	
+	public double getQuantil(double percent) {
+		if (!sorted) {
+			Collections.sort(values);
+			sorted = true;
+		}
+		int idx = (int)(0.01*percent*(values.size()-1));
+		return values.get(idx);
 	}
 	
 	public double getMin() {
